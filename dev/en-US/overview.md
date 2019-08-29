@@ -1,66 +1,53 @@
 ---
-title: TiDB 简介
-category: introduction
+title: 数据迁移概述
+category: how-to
 ---
 
-# TiDB 简介
+# 数据迁移概述
 
-TiDB 是 PingCAP 公司设计的开源分布式 HTAP (Hybrid Transactional and Analytical Processing) 数据库，结合了传统的 RDBMS 和 NoSQL 的最佳特性。TiDB 兼容 MySQL，支持无限的水平扩展，具备强一致性和高可用性。TiDB 的目标是为 OLTP (Online Transactional Processing) 和 OLAP (Online Analytical Processing) 场景提供一站式的解决方案。
+本文档介绍了 TiDB 提供的数据迁移工具，以及不同迁移场景下如何选择迁移工具，从而将数据从 MySQL 或 CSV 数据源迁移到 TiDB。
 
-TiDB 具备如下特性：
+## 迁移工具
 
-- 高度兼容 MySQL
-    
-    [大多数情况下](/reference/mysql-compatibility.md)，无需修改代码即可从 MySQL 轻松迁移至 TiDB，分库分表后的 MySQL 集群亦可通过 TiDB 工具进行实时迁移。
+在上述数据迁移过程中会用到如下工具：
 
-- 水平弹性扩展
-    
-    通过简单地增加新节点即可实现 TiDB 的水平扩展，按需扩展吞吐或存储，轻松应对高并发、海量数据场景。
+- [Mydumper](/reference/tools/mydumper.md)：用于从 MySQL 导出数据。建议使用 Mydumper，而非 mysqldump。
+- [Loader](/reference/tools/loader.md)：用于将 Mydumper 导出格式的数据导入到 TiDB。
+- [Syncer](/reference/tools/syncer.md)：用于将数据从 MySQL 增量同步到 TiDB。
+- [DM (Data Migration)](/reference/tools/data-migration/overview.md)：集成了 Mydumper、Loader、Syncer 的功能，支持 MySQL 数据的全量导出和到 TiDB 的全量导入，还支持 MySQL binlog 数据到 TiDB 的增量同步。
+- [TiDB-Lightning](/reference/tools/tidb-lightning/overview.md)：用于将全量数据高速导入到 TiDB 集群。例如，如果要导入超过 1TiB 的数据，使用 Loader 往往需花费几十个小时，而使用 TiDB-Lighting 的导入速度至少是 Loader 的三倍。
 
-- 分布式事务
-    
-    TiDB 100% 支持标准的 ACID 事务。
+## 迁移场景
 
-- 真正金融级高可用
-    
-    相比于传统主从 (M-S) 复制方案，基于 Raft 的多数派选举协议可以提供金融级的 100% 数据强一致性保证，且在不丢失大多数副本的前提下，可以实现故障的自动恢复 (auto-failover)，无需人工介入。
+本小节将通过几个示例场景来说明如何选择和使用 TiDB 的迁移工具。
 
-- 一站式 HTAP 解决方案
-    
-    TiDB 作为典型的 OLTP 行存数据库，同时兼具强大的 OLAP 性能，配合 TiSpark，可提供一站式 HTAP 解决方案，一份存储同时处理 OLTP & OLAP，无需传统繁琐的 ETL 过程。
+### MySQL 数据的全量迁移
 
-- 云原生 SQL 数据库
-    
-    TiDB 是为云而设计的数据库，支持公有云、私有云和混合云，配合 [TiDB Operator 项目](/tidb-in-kubernetes/tidb-operator-overview.md) 可实现自动化运维，使部署、配置和维护变得十分简单。
+要将数据从 MySQL 全量迁移至 TiDB，可以采用以下三种方案中一种：
 
-TiDB 的设计目标是 100% 的 OLTP 场景和 80% 的 OLAP 场景，更复杂的 OLAP 分析可以通过 [TiSpark 项目](/reference/tispark.md)来完成。
+- **Mydumper + Loader**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 Loader 将数据导入至 TiDB。
+- **Mydumper + TiDB-Lightning**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 TiDB-Lightning 将数据导入至 TiDB。
+- **DM**：直接使用 DM 将数据从 MySQL 导出，然后将数据导入至 TiDB。
 
-TiDB 对业务没有任何侵入性，能优雅的替换传统的数据库中间件、数据库分库分表等 Sharding 方案。同时它也让开发运维人员不用关注数据库 Scale 的细节问题，专注于业务开发，极大的提升研发的生产力。
+详细操作参见 [MySQL 数据到 TiDB 的全量迁移](/how-to/migrate/from-mysql.md)。
 
-三篇文章了解 TiDB 技术内幕：
+### MySQL 数据的全量迁移和增量同步
 
-- [说存储](https://pingcap.com/blog-cn/tidb-internal-1/)
-- [说计算](https://pingcap.com/blog-cn/tidb-internal-2/)
-- [谈调度](https://pingcap.com/blog-cn/tidb-internal-3/)
+- **Mydumper + Loader + Syncer**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 Loader 将数据导入至 TiDB，再使用 Syncer 将 MySQL binlog 数据增量同步至 TiDB。
+- **Mydumper + TiDB-Lightning + Syncer**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 TiDB-Lightning 将数据导入至 TiDB，再使用 Syncer 将 MySQL binlog 数据增量同步至 TiDB。
+- **DM**：先使用 DM 将数据从 MySQL 全量迁移至 TiDB，然后使用 DM 将 MySQL binlog 数据增量同步至 TiDB。
 
-## 部署方式
+详细操作参见 [MySQL 数据到 TiDB 的增量同步](/how-to/migrate/incrementally-from-mysql.md)。
 
-TiDB 可以部署在本地和云平台上，支持公有云、私有云和混合云。你可以根据实际场景或需求，选择相应的方式来部署 TiDB 集群：
+> **注意：**
+> 
+> 在将 MySQL binlog 数据增量同步至 TiDB 前，需要[在 MySQL 中开启 binlog 功能](http://dev.mysql.com/doc/refman/5.7/en/replication-howto-masterbaseconfig.html)，并且 binlog 必须[使用 `ROW` 格式](https://dev.mysql.com/doc/refman/5.7/en/binary-log-formats.html)。
 
-- [使用 Ansible 部署](/how-to/deploy/orchestrated/ansible.md)：如果用于生产环境，推荐使用 Ansible 部署 TiDB 集群。
-- [使用 Ansible 离线部署](/how-to/deploy/orchestrated/offline-ansible.md)：如果部署环境无法访问网络，可使用 Ansible 进行离线部署。
-- [使用 TiDB Operator 部署](/tidb-in-kubernetes/deploy/tidb-operator.md)：使用 TiDB Operator 在 Kubernetes 集群上部署生产就绪的 TiDB 集群，支持[部署到 AWS EKS](/tidb-in-kubernetes/deploy/aws-eks.md)、[部署到谷歌云 GKE (beta)](/tidb-in-kubernetes/deploy/gcp-gke.md)、[部署到阿里云 ACK](/tidb-in-kubernetes/deploy/alibaba-cloud.md) 等。
-- [使用 Docker Compose 部署](/how-to/get-started/deploy-tidb-from-docker-compose.md)：如果你只是想测试 TiDB、体验 TiDB 的特性，或者用于开发环境，可以使用 Docker Compose 在本地快速部署 TiDB 集群。该部署方式不适用于生产环境。
-- [使用 Docker 部署](/how-to/deploy/orchestrated/docker.md)：你可以使用 Docker 部署 TiDB 集群，但该部署方式不适用于生产环境。
-- [使用 TiDB Operator 部署到 Minikube](/tidb-in-kubernetes/get-started/deploy-tidb-from-kubernetes-minikube.md)：你可以使用 TiDB Opeartor 将 TiDB 集群部署到本地 Minikube 启动的 Kubernetes 集群中。该部署方式不适用于生产环境。
-- [使用 TiDB Operator 部署到 DinD](/tidb-in-kubernetes/get-started/deploy-tidb-from-kubernetes-dind.md)：你可以使用 TiDB Operator 将 TiDB 集群部署到本地以 DinD 方式启动的 Kubernetes 集群中。该部署方式不适用于生产环境。
+### 非 MySQL 数据源的数据迁移
 
-## 项目源码
+如果源数据库不是 MySQL，建议采用以下步骤进行数据迁移：
 
-TiDB 集群所有组件的源码均可从 GitHub 上直接访问：
+1. 将数据导出为 CSV 格式。
+2. 使用 TiDB-Lightning 将 CSV 格式的数据导入 TiDB。
 
-- [TiDB](https://github.com/pingcap/tidb)
-- [TiKV](https://github.com/tikv/tikv)
-- [PD](https://github.com/pingcap/pd)
-- [TiSpark](https://github.com/pingcap/tispark)
-- [TiDB Operator](https://github.com/pingcap/tidb-operator)
+详细操作参见[使用 TiDB-Lightning 迁移 CSV 数据](/reference/tools/tidb-lightning/csv.md)。
