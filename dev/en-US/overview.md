@@ -1,99 +1,38 @@
 ---
-title: TiDB 事务语句
+title: TiDB Lightning 简介
 category: reference
 ---
 
-# TiDB 事务语句
+# TiDB Lightning 简介
 
-TiDB 支持分布式事务。涉及到事务的语句包括 `autocommit` 变量、`[BEGIN|START TRANSACTION]`、`COMMIT` 以及 `ROLLBACK`。
+TiDB Lightning 是一个将全量数据高速导入到 TiDB 集群的工具，有以下两个主要的使用场景：一是大量新数据的快速导入；二是全量数据的备份恢复。目前，支持 mydumper 或 CSV 输出格式的数据源。您可以在以下两种场景下使用 Lightning：
 
-## 自动提交
+- **迅速**导入**大量新**数据。
+- 备份恢复所有数据。
 
-语法：
+## TiDB Lightning 整体架构
 
-```sql
-SET autocommit = {0 | 1}
-```
+TiDB Lightning 主要包含两个部分:
 
-通过设置 `autocommit` 的值为 1，可以将当前 Session 设置为自动提交状态，0 则表示当前 Session 为非自动提交状态。默认情况下，`autocommit` 的值为 1。
+- **`tidb-lightning`**（“前端”）：主要完成适配工作，通过读取数据源，在下游 TiDB 集群建表、将数据转换成键/值对 (KV 对) 发送到 `tikv-importer`、检查数据完整性等。
+- **`tikv-importer`**（“后端”）：主要完成将数据导入 TiKV 集群的工作，把 `tidb-lightning` 写入的 KV 对缓存、排序、切分并导入到 TiKV 集群。
 
-在自动提交状态，每条语句运行后，会将其修改自动提交到数据库中。否则，会等到运行 `COMMIT` 语句或者是某些会造成隐式提交的情况，详见 [implicit commit](https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html)。比如，执行 `[BEGIN|START TRANCATION]` 语句的时候会试图提交上一个事务，并开启一个新的事务。
+![TiDB Lightning 其整体架构](/media/tidb-lightning-architecture.png)
 
-另外 `autocommit` 也是一个 System Variable，所以可以通过变量赋值语句修改当前 Session 或者是 Global 的值。
+TiDB Lightning 整体工作原理如下：
 
-```sql
-SET @@SESSION.autocommit = {0 | 1};
-SET @@GLOBAL.autocommit = {0 | 1};
-```
+1. 在导数据之前，`tidb-lightning` 会自动将 TiKV 集群切换为“导入模式” (import mode)，优化写入效率并停止自动压缩 (compaction)。
 
-## START TRANSACTION, BEGIN
+2. `tidb-lightning` 会在目标数据库建立架构和表，并获取其元数据。
 
-语法:
+3. 每张表都会被分割为多个连续的*区块*，这样来自大表（200 GB+）的数据就可以用增量方式导入。
 
-```sql
-BEGIN;
+4. `tidb-lightning` 会通过 gRPC 让 `tikv-importer` 为每一个区块准备一个“引擎文件 (engine file)”来处理 KV 对。`tidb-lightning` 会并发读取 SQL dump，将数据源转换成与 TiDB 相同编码的 KV 对，然后发送到 `tikv-importer` 里对应的引擎文件。
 
-START TRANSACTION;
+5. 当一个引擎文件数据写入完毕时，`tikv-importer` 便开始对目标 TiKV 集群数据进行分裂和调度，然后导入数据到 TiKV 集群。
+    
+    引擎文件包含两种：*数据引擎*与*索引引擎*，各自又对应两种 KV 对：行数据和次级索引。通常行数据在数据源里是完全有序的，而次级索引是无序的。因此，数据引擎文件在对应区块写入完成后会被立即上传，而所有的索引引擎文件只有在整张表所有区块编码完成后才会执行导入。
 
-START TRANSACTION WITH CONSISTENT SNAPSHOT;
-```
+6. 整张表相关联的所有引擎文件完成导入后，`tidb-lightning` 会对比本地数据源及下游集群的校验和 (checksum)，确保导入的数据无损，以及让 TiDB 分析 (`ANALYZE`) 这些新增的数据，以优化日后的操作。
 
-上述三条语句都是事务开始语句，效果相同。通过事务开始语句可以显式地开始一个新的事务，如果这个时候当前 Session 正在一个事务中间过程中，会将当前事务提交后，开启一个新的事务。
-
-## COMMIT
-
-语法：
-
-```sql
-COMMIT;
-```
-
-提交当前事务，包括从 `[BEGIN|START TRANSACTION]` 到 `COMMIT` 之间的所有修改。
-
-## ROLLBACK
-
-语法：
-
-```sql
-ROLLBACK;
-```
-
-回滚当前事务，撤销从 `[BEGIN|START TRANSACTION]` 到 `ROLLBACK` 之间的所有修改。
-
-## 显式事务和隐式事务
-
-TiDB 可以显式地使用事务（`[BEGIN|START TRANSACTION]`/`COMMIT`）或者隐式的使用事务（`SET autocommit = 1`）。
-
-如果在 `autocommit = 1` 的状态下，通过 `[BEGIN|START TRANSACTION]` 语句开启一个新的事务，那么在 `COMMIT`/`ROLLBACK` 之前，会禁用 autocommit，也就是变成显式事务。
-
-对于 DDL 语句，会自动提交并且不能回滚。如果运行 DDL 的时候，正在一个事务的中间过程中，会先将当前的事务提交，再执行 DDL。
-
-## 事务隔离级别
-
-TiDB **只支持** `SNAPSHOT ISOLATION`，可以通过下面的语句将当前 Session 的隔离级别设置为 `READ COMMITTED`，这只是语法上的兼容，事务依旧是以 `SNAPSHOT ISOLATION` 来执行。
-
-```sql
-SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
-```
-
-## 事务的惰性检查
-
-TiDB 中，对于普通的 `INSERT` 语句写入的值，会进行惰性检查。惰性检查的含义是，不在 `INSERT` 语句执行时进行唯一约束的检查，而在事务提交时进行唯一约束的检查。
-
-举例：
-
-```sql
-CREATE TABLE T (I INT KEY);
-INSERT INTO T VALUES (1);
-BEGIN;
-INSERT INTO T VALUES (1); -- MySQL 返回错误；TiDB 返回成功
-INSERT INTO T VALUES (2);
-COMMIT; -- MySQL 提交成功；TiDB 返回错误，事务回滚
-SELECT * FROM T; -- MySQL 返回 1 2；TiDB 返回 1
-```
-
-惰性检查的意义在于，如果对事务中每个 `INSERT` 语句都立刻进行唯一性约束检查，将造成很高的网络开销。而在提交时进行一次批量检查，将会大幅提升性能。
-
-> **注意：**
-> 
-> 本优化对于 `INSERT IGNORE` 和 `INSERT ON DUPLICATE KEY UPDATE` 不会生效，仅对与普通的 `INSERT` 语句生效。
+7. 在所有步骤完毕后，`tidb-lightning` 自动将 TiKV 切换回“普通模式” (normal mode)，此后 TiDB 集群可以正常对外提供服务。
