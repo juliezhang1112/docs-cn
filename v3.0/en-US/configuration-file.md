@@ -1,1045 +1,395 @@
 ---
-title: TiKV 配置文件描述
+title: TiDB 配置文件描述
 category: reference
+aliases:
+  - '/docs-cn/op-guide/tidb-config-file/'
 ---
 
 <!-- markdownlint-disable MD001 -->
 
-# TiKV 配置文件描述
+# TiDB 配置文件描述
 
-TiKV 配置文件比命令行参数支持更多的选项。你可以在 [etc/config-template.toml](https://github.com/tikv/tikv/blob/master/etc/config-template.toml) 找到默认值的配置文件，重命名为 config.toml 即可。
+TiDB 配置文件比命令行参数支持更多的选项。你可以在 [config/config.toml.example](https://github.com/pingcap/tidb/blob/master/config/config.toml.example) 找到默认值的配置文件，重命名为 config.toml 即可。
 
-本文档只阐述未包含在命令行参数中的参数，命令行参数参见[这里](/reference/configuration/tikv-server/configuration.md)。
+本文档只阐述未包含在命令行参数中的参数，命令行参数参见[这里](/reference/configuration/tidb-server/configuration.md)。
 
-### `status-thread-pool-size`
+### `split-table`
 
-+ Http API 服务的工作线程数量。
-+ 默认值：1
-+ 最小值：1
-
-### `grpc-compression-type`
-
-+ gRPC 消息的压缩算法，取值：none， deflate， gzip。
-+ 默认值：none
-
-### `grpc-concurrency`
-
-+ gRPC 工作线程的数量。
-+ 默认值：4
-+ 最小值：1
-
-### `grpc-concurrent-stream`
-
-+ 一个 gRPC 链接中最多允许的并发请求数量。
-+ 默认值：1024
-+ 最小值：1
-
-### `server.grpc-raft-conn-num`
-
-+ tikv 节点之间用于 raft 通讯的链接最大数量。
-+ 默认值：10
-+ 最小值：1
-
-### `server.grpc-stream-initial-window-size`
-
-+ gRPC stream 的 window 大小。
-+ 默认值：2MB
-+ 单位：KB|MB|GB
-+ 最小值：1KB
-
-### `server.grpc-keepalive-time`
-
-+ gRPC 发送 keep alive ping 消息的间隔时长。
-+ 默认值：10s
-+ 最小值：1s
-
-### `server.grpc-keepalive-timeout`
-
-+ 关闭 gRPC 链接的超时时长。
-+ 默认值：3s
-+ 最小值：1s
-
-### `server.concurrent-send-snap-limit`
-
-+ 同时发送 snapshot 的最大个数，默认值：32
-+ 默认值：32
-+ 最小值：1
-
-### `server.concurrent-recv-snap-limit`
-
-+ 同时接受 snapshot 的最大个数，默认值：32
-+ 默认值：32
-+ 最小值：1
-
-### `server.end-point-recursion-limit`
-
-+ endpoint 下推查询请求解码消息时，最多允许的递归层数。
-+ 默认值：1000
-+ 最小值：1
-
-### `server.end-point-request-max-handle-duration`
-
-+ endpoint 下推查询请求处理任务最长允许的时长。
-+ 默认值：60s
-+ 最小值：1s
-
-### `server.snap-max-write-bytes-per-sec`
-
-+ 处理 snapshot 时最大允许使用的磁盘带宽
-+ 默认值：1000MB
-+ 单位：KB|MB|GB
-+ 最小值：1KB
-
-## readpool.storage
-
-存储线程池相关的配置项。
-
-### `high-concurrency`
-
-+ 处理高优先级读请求的线程池线程数量。
-+ 默认值：4
-+ 最小值：1
-
-### `normal-concurrency`
-
-+ 处理普通优先级读请求的线程池线程数量。
-+ 默认值：4
-+ 最小值：1
-
-### `low-concurrency`
-
-+ 处理低优先级读请求的线程池线程数量。
-+ 默认值：4
-+ 最小值：1
-
-### `max-tasks-per-worker-high`
-
-+ 高优先级线程池中单个线程允许积压的最大任务数量，超出后会返回 Server Is Busy。
-+ 默认值：2000
-+ 最小值：2
-
-### `max-tasks-per-worker-normal`
-
-+ 普通优先级线程池中单个线程允许积压的最大任务数量，超出后会返回 Server Is Busy。
-+ 默认值：2000
-+ 最小值：2
-
-### `max-tasks-per-worker-low`
-
-+ 低优先级线程池中单个线程允许积压的最大任务数量，超出后会返回 Server Is Busy。
-+ 默认值：2000
-+ 最小值：2
-
-### `stack-size`
-
-+ Storage 读线程池中线程的栈大小。
-+ 默认值：10MB
-+ 单位：KB|MB|GB
-+ 最小值：2MB
-
-## readpool.coprocessor
-
-协处理器线程池相关的配置项。
-
-### `high-concurrency`
-
-+ 处理高优先级 Coprocessor 请求（如点查）的线程池线程数量。
-+ 默认值：CPU * 0.8
-+ 最小值：1
-
-### `normal-concurrency`
-
-+ 处理普通优先级 Coprocessor 请求的线程池线程数量。
-+ 默认值：CPU * 0.8
-+ 最小值：1
-
-### `low-concurrency`
-
-+ 处理低优先级 Coprocessor 请求（如扫表）的线程池线程数量。
-+ 默认值：CPU * 0.8
-+ 最小值：1
-
-### `max-tasks-per-worker-high`
-
-+ 高优先级线程池中单个线程允许积压的任务数量，超出后会返回 Server Is Busy。
-+ 默认值：2000
-+ 最小值：2
-
-### `max-tasks-per-worker-normal`
-
-+ 普通优先级线程池中单个线程允许积压的任务数量，超出后会返回 Server Is Busy。
-+ 默认值：2000
-+ 最小值：2
-
-### `max-tasks-per-worker-low`
-
-+ 低优先级线程池中单个线程允许积压的任务数量，超出后会返回 Server Is Busy。
-+ 默认值：2000
-+ 最小值：2
-
-### `stack-size`
-
-Coprocessor 线程池中线程的栈大小，默认值：10，单位：KiB|MiB|GiB。
-
-+ 默认值：10MB
-+ 单位：KB|MB|GB
-+ 最小值：2MB
-
-## storage
-
-存储相关的配置项。
-
-### `scheduler-notify-capacity`
-
-+ scheduler 一次获取最大消息个数
-+ 默认值：10240
-+ 最小值：1
-
-### `scheduler-concurrency`
-
-+ scheduler 内置一个内存锁机制，防止同时对一个 key 进行操作。每个 key hash 到不同的槽。
-+ 默认值：2048000
-+ 最小值：1
-
-### `scheduler-worker-pool-size`
-
-+ scheduler 线程个数，主要负责写入之前的事务一致性检查工作。
-+ 默认值：4
-+ 最小值：1
-
-### `scheduler-pending-write-threshold`
-
-+ 写入数据队列的最大值，超过该值之后对于新的写入 TiKV 会返回 Server Is Busy 错误。
-+ 默认值：100MB
-+ 单位: MB|GB
-
-## raftstore
-
-raftstore 相关的配置项。
-
-### `sync-log`
-
-+ 数据、log 落盘是否 sync，注意：设置成 false 可能会丢数据。
++ 为每个 table 建立单独的 Region。
 + 默认值：true
++ 如果需要创建大量的表，我们建议把这个参数设置为 false。
 
-### `prevote`
+### `oom-action`
 
-+ 开启 Prevote 的开关，开启有助于减少隔离恢复后对系统造成的抖动。
-+ 默认值：true
++ 指定 TiDB 发生 out-of-memory 错误时的操作。
++ 默认值："log"
++ 现在合法的选项是 ["log", "cancel"]，如果为 "log"，仅仅是打印日志，不作实质处理。如果为 "cancel"，我们会取消执行这个操作，并且输出日志。
 
-### `raftdb-path`
+### `mem-quota-query`
 
-+ raft 库的路径，默认存储在 storage.data-dir/raft 下。
-+ 默认值：""
++ 单条 SQL 语句可以占用的最大内存阈值。
++ 默认值：34359738368
++ 超过该值的请求会被 `oom-action` 定义的行为所处理。
 
-### `raft-base-tick-interval`
+### `enable-streaming`
 
-+ 状态机 tick 一次的间隔时间。
-+ 默认值：1s
-+ 最小值：大于 0
-
-### `raft-heartbeat-ticks`
-
-+ 发送心跳时经过的 tick 个数，即每隔 raft-base-tick-interval * raft-heartbeat-ticks 时间发送一次心跳。
-+ 默认值：2
-+ 最小值：大于 0
-
-### `raft-election-timeout-ticks`
-
-+ 发起选举时经过的 tick 个数，即如果处于无主状态，大约经过 raft-base-tick-interval * raft-election-timeout-ticks 时间以后发起选举。
-+ 默认值：10
-+ 最小值：raft-heartbeat-ticks
-
-### `raft-min-election-timeout-ticks`
-
-+ 发起选举时至少经过的 tick 个数，如果为 0，则表示使用 raft-election-timeout-ticks，不能比 raft-election-timeout-ticks 小。
-+ 默认值：0
-+ 最小值：0
-
-### `raft-max-election-timeout-ticks`
-
-+ 发起选举时最多经过的 tick 个数，如果为 0，则表示使用 raft-election-timeout-ticks * 2。
-+ 默认值：0
-+ 最小值：0
-
-### `raft-max-size-per-message`
-
-+ 产生的单个消息包的大小限制，软限制。
-+ 默认值：1MB
-+ 最小值：0
-+ 单位：MB
-
-### `raft-max-inflight-msgs`
-
-+ 待确认日志个数的数量，如果超过这个数量将会减缓发送日志的个数。
-+ 默认值：256
-+ 最小值：大于0
-
-### `raft-entry-max-size`
-
-+ 单个日志最大大小，硬限制。
-+ 默认值：8MB
-+ 最小值：0
-+ 单位：MB|GB
-
-### `raft-log-gc-tick-interval`
-
-+ 删除 raft 日志的轮询任务调度间隔时间，0 表示不启用。
-+ 默认值：10s
-+ 最小值：0
-
-### `raft-log-gc-threshold`
-
-+ 允许残余的 raft 日志个数，这是一个软限制。
-+ 默认值：50
-+ 最小值：1
-
-### `raft-log-gc-count-limit`
-
-+ 允许残余的 raft 日志个数，这是一个硬限制。默认值为按照每个日志 1MB 而计算出来的 3/4 region 大小所能容纳的日志个数。
-+ 最小值：0
-
-### `raft-log-gc-size-limit`
-
-+ 允许残余的 raft 日志大小，这是一个硬限制，默认为 region 大小的 3/4。
-+ 最小值：大于 0
-
-### `raft-entry-cache-life-time`
-
-+ 内存中日志 cache 允许的最长残留时间。
-+ 默认值：30s
-+ 最小值：0
-
-### `raft-reject-transfer-leader-duration`
-
-+ 新节点保护时间，控制迁移 leader 到新加节点的最小时间，设置过小容易导致迁移 leader 失败。
-+ 默认值：3s
-+ 最小值：0
-
-### `split-region-check-tick-interval`
-
-+ 检查 region 是否需要分裂的时间间隔，0 表示不启用。
-+ 默认值：10s
-+ 最小值：0
-
-### `region-split-check-diff`
-
-+ 允许 region 数据超过指定大小的最大值，默认为 region 大小的 1/16。
-+ 最小值：0
-
-### `region-compact-check-interval`
-
-+ 检查是否需要人工触发 rocksdb compaction 的时间间隔，0 表示不启用。
-+ 默认值：5m
-+ 最小值：0
-
-### `clean-stale-peer-delay`
-
-+ 延迟删除过期副本数据的时间。
-+ 默认值：10m
-+ 最小值：0
-
-### `region-compact-check-step`
-
-+ 每轮校验人工 compaction 时，一次性检查的 region 个数。
-+ 默认值：100
-+ 最小值：0
-
-### `region-compact-min-tombstones`
-
-+ 触发 rocksdb compaction 需要的 tombstone 个数。
-+ 默认值：10000
-+ 最小值：0
-
-### `region-compact-tombstones-percent`
-
-+ 触发 rocksdb compaction 需要的 tombstone 所占比例。
-+ 默认值：30
-+ 最小值：1
-+ 最大值：100
-
-### `pd-heartbeat-tick-interval`
-
-+ 触发 region 对 PD 心跳的时间间隔，0 表示不启用。
-+ 默认值：1m
-+ 最小值：0
-
-### `pd-store-heartbeat-tick-interval`
-
-+ 触发 store 对 PD 心跳的时间间隔，0 表示不启用。
-+ 默认值：10s
-+ 最小值：0
-
-### `snap-mgr-gc-tick-interval`
-
-+ 触发回收过期 snapshot 文件的时间间隔，0 表示不启用。
-+ 默认值：5s
-+ 最小值：0
-
-### `snap-gc-timeout`
-
-+ snapshot 文件的最长保存时间。
-+ 默认值：4h
-+ 最小值：0
-
-### `lock-cf-compact-interval`
-
-+ 触发对 lock CF compact 检查的时间间隔。
-+ 默认值：10m
-+ 最小值：0
-
-### `lock-cf-compact-bytes-threshold`
-
-+ 触发对 lock CF 进行 compact 的大小。
-+ 默认值：256MB
-+ 最小值：0
-+ 单位：MB
-
-### `notify-capacity`
-
-+ region 消息队列的最长长度。
-+ 默认值：40960
-+ 最小值：0
-
-### `messages-per-tick`
-
-+ 每轮处理的消息最大个数。
-+ 默认值：4096
-+ 最小值：0
-
-### `max-peer-down-duration`
-
-+ 副本允许的最长未响应时间，超过将被标记为 down，后续 PD 会尝试将其删掉。
-+ 默认值：5m
-+ 最小值：0
-
-### `max-leader-missing-duration`
-
-+ 允许副本处于无主状态的最长时间，超过将会向 PD 校验自己是否已经被删除。
-+ 默认值：2h
-+ 最小值：> abnormal-leader-missing-duration
-
-### `abnormal-leader-missing-duration`
-
-+ 允许副本处于无主状态的时间，超过将视为异常，标记在 metrics 和日志中。
-+ 默认值：10m
-+ 最小值：> peer-stale-state-check-interval
-
-### `peer-stale-state-check-interval`
-
-+ 触发检验副本是否处于无主状态的时间间隔。
-+ 默认值：5m
-+ 最小值：> 2 * election-timeout
-
-### `leader-transfer-max-log-lag`
-
-+ 尝试转移领导权时被转移者允许的最大日志缺失个数。
-+ 默认值：10
-+ 最小值：10
-
-### `snap-apply-batch-size`
-
-+ 当导入 snapshot 文件需要写数据时，内存写缓存的大小
-+ 默认值：10MB
-+ 最小值：0
-+ 单位：MB
-
-### `consistency-check-interval`
-
-+ 触发一致性检查的时间间隔, 0 表示不启用。
-+ 默认值：0s
-+ 最小值：0
-
-### `raft-store-max-leader-lease`
-
-+ region 主可信任期的最长时间。
-+ 默认值：9s
-+ 最小值：0
-
-### `right-derive-when-split`
-
-+ 为 true 时，以最大分裂 key 为起点的 region 复用原 region 的 key；否则以原 region 起点 key 作为起点的 region 复用原 region 的 key。
-+ 默认值：true
-
-### `allow-remove-leader`
-
-+ 允许删除主开关。
++ 开启 coprocessor 的 streaming 获取数据模式。
 + 默认值：false
 
-### `merge-max-log-gap`
+### `lower-case-table-names`
 
-+ 进行 merge 时，允许的最大日志缺失个数。
-+ 默认值：10
-+ 最小值：> raft-log-gc-count-limit
-
-### `merge-check-tick-interval`
-
-+ 触发 merge 完成检查的时间间隔。
-+ 默认值：10s
-+ 最小值：大于 0
-
-### `use-delete-range`
-
-+ 开启 rocksdb delete_range 接口删除数据的开关。
-+ 默认值：false
-
-### `cleanup-import-sst-interval`
-
-+ 触发检查过期 SST 文件的时间间隔，0 表示不启用。
-+ 默认值：10m
-+ 最小值：0
-
-### `local-read-batch-size`
-
-+ 一轮处理读请求的最大个数。
-+ 默认值：1024
-+ 最小值：大于 0
-
-### `apply-max-batch-size`
-
-+ 一轮处理数据落盘的最大请求个数。
-+ 默认值：1024
-+ 最小值：大于 0
-
-### `apply-pool-size`
-
-+ 处理数据落盘的线程池线程数。
++ 这个选项可以设置 TiDB 的系统变量 `lower_case_table_names` 的值。
 + 默认值：2
-+ 最小值：大于 0
++ 具体可以查看 MySQL 关于这个变量的[描述](https://dev.mysql.com/doc/refman/5.7/en/server-system-variables.html#sysvar_lower_case_table_names)
 
-### `store-max-batch-size`
+> **注意：**
+> 
+> 目前 TiDB 只支持将该选项的值设为 2，即按照大小写来保存表名，按照小写来比较（不区分大小写）。
 
-+ 一轮处理的最大请求个数。
-+ 默认值：1024
-+ 最小值：大于 0
+### `lease`
 
-### `store-pool-size`
-
-+ 处理 raft 的线程池线程数。
-+ 默认值：2
-+ 最小值：大于 0
-
-### `future-poll-size`
-
-+ 驱动 future 的线程池线程数。
-+ 默认值：1
-+ 最小值：大于 0
-
-## coprocessor
-
-协处理器相关的配置项。
-
-### `split-region-on-table`
-
-+ 开启按 table 分裂 Region的开关，建议仅在 TiDB 模式下使用。
-+ 默认值：true
-
-### `batch-split-limit`
-
-+ 批量分裂 Region 的阈值，调大该值可加速分裂 Region。
-+ 默认值：10
-+ 最小值：1
-
-### `region-max-size`
-
-+ Region 容量空间最大值，超过时系统分裂成多个 Region。
-+ 默认值：144MB
-+ 单位：KB|MB|GB
-
-### `region-split-size`
-
-+ 分裂后新 Region 的大小，此值属于估算值。
-+ 默认值：96MB
-+ 单位：KB|MB|GB
-
-### `region-max-keys`
-
-+ Region 最多允许的 key 的个数，超过时系统分裂成多个 Region。
-+ 默认值：1440000
-
-### `region-split-keys`
-
-+ 分裂后新 Region 的 key 的个数，此值属于估算值。
-+ 默认值：960000
-
-## rocksdb
-
-rocksdb 相关的配置项。
-
-### `max-background-jobs`
-
-+ RocksDB 后台线程个数。
-+ 默认值：8
-+ 最小值：1
-
-### `max-sub-compactions`
-
-+ RocksDB 进行 subcompaction 的并发个数。
-+ 默认值：1
-+ 最小值：1
-
-### `max-open-files`
-
-+ RocksDB 可以打开的文件总数。
-+ 默认值：40960
-+ 最小值：-1
-
-### `max-manifest-file-size`
-
-+ RocksDB Manifest 文件最大大小。
-+ 默认值：128MB
-+ 最小值：0
-+ 单位：B|KB|MB|GB
-
-### `create-if-missing`
-
-+ 自动创建 DB 开关。
-+ 默认值：true
-
-### `wal-recovery-mode`
-
-+ WAL 恢复模式，取值：0（TolerateCorruptedTailRecords），1（AbsoluteConsistency），2（PointInTimeRecovery），3（SkipAnyCorruptedRecords）。
-+ 默认值：2
-+ 最小值：0
-+ 最大值：3
-
-### `wal-dir`
-
-+ WAL 存储目录，默认：“tmp/tikv/store”。
-+ 默认值：/tmp/tikv/store
-
-### `wal-ttl-seconds`
-
-+ 归档 WAL 生存周期，超过该值时，系统会删除相关 WAL。
-+ 默认值：0
-+ 最小值：0
++ DDL 租约超时时间。
++ 默认值：45s
 + 单位：秒
 
-### `wal-size-limit`
+### `compatible-kill-query`
 
-+ 归档 WAL 大小限制，超过该值时，系统会删除相关 WAL。
-+ 默认值：0
-+ 最小值：0
-+ 单位：B|KB|MB|GB
-
-### `enable-statistics`
-
-+ 开启自动优化 Rate LImiter 的配置的开关。
++ 设置 `KILL` 语句的兼容性。
 + 默认值：false
++ TiDB 中 `KILL xxx` 的行为和 MySQL 中的行为不相同。为杀死一条查询，在 TiDB 里需要加上 `TIDB` 关键词，即 `KILL TIDB xxx`。但如果把 `compatible-kill-query` 设置为 true，则不需要加上 `TIDB` 关键词。
++ 这种区别很重要，因为当用户按下 <kbd>Ctrl</kbd>+<kbd>C</kbd> 时，MySQL 命令行客户端的默认值行为是：创建与后台的新连接，并在该新连接中执行 `KILL` 语句。如果负载均衡器或代理已将该新连接发送到与原始会话不同的 TiDB 服务器实例，则该错误会话可能被终止，从而导致使用 TiDB 集群的业务中断。只有当您确定在 `KILL` 语句中引用的连接正好位于 `KILL` 语句发送到的服务器上时，才可以启用 `compatible-kill-query`。
 
-### `stats-dump-period`
+### `check-mb4-value-in-utf8`
 
-+ 开启或关闭 Pipelined Write。
++ 开启检查 utf8mb4 字符的开关，如果开启此功能，字符集是 utf8，且在 utf8 插入 mb4 字符，系统将会报错。
 + 默认值：true
 
-### `compaction-readahead-size`
+### `treat-old-version-utf8-as-utf8mb4`
 
-+ 异步 Sync 限速速率。
-+ 默认值：0
-+ 最小值：0
-+ 单位：B|KB|MB|GB
-
-### `writable-file-max-buffer-size`
-
-+ WritableFileWrite 所使用的最大的 buffer 大小。
-+ 默认值：1MB
-+ 最小值：0
-+ 单位：B|KB|MB|GB
-
-### `use-direct-io-for-flush-and-compaction`
-
-+ flush 或者 compaction 开启 DirectIO 的开关。
-+ 默认值：false
-
-### `rate-bytes-per-sec`
-
-+ Rate Limiter 限制速率。
-+ 默认值：0
-+ 最小值：0
-+ 单位：Bytes
-
-### `rate-limiter-mode`
-
-+ Rate LImiter 模式，取值：1（ReadOnly），2（WriteOnly），3（AllIo）。
-+ 默认值：2
-+ 最小值：1
-+ 最大值：3
-
-### `auto-tuned`
-
-+ 开启自动优化 Rate LImiter 的配置的开关。
-+ 默认值：false
-
-### `enable-pipelined-write`
-
-+ 开启 Pipelined Write 的开关。
++ 将旧表中的 utf8 字符集当成 utf8mb4的开关。
 + 默认值：true
 
-### `bytes-per-sync`
+## log
 
-+ 异步 Sync 限速速率。
-+ 默认值：1MB
-+ 最小值：0
-+ 单位：B|KB|MB|GB
+日志相关的配置项。
 
-### `wal-bytes-per-sync`
+### `format`
 
-+ WAL Sync 限速速率，默认：512KB。
-+ 默认值：512KB
-+ 最小值：0
-+ 单位：B|KB|MB|GB
++ 指定日志输出的格式，可选项为 [json, text, console]。
++ 默认值："text"
 
-### `info-log-max-size`
+### `disable-timestamp`
 
-+ Info 日志的最大大小。
-+ 默认值：1GB
-+ 最小值：0
-+ 单位：B|KB|MB|GB
++ 是否禁止在日志中输出时间戳。
++ 默认值：false
++ 如果设置为 true，那么日志里面将不会输出时间戳。
 
-### `info-log-roll-time`
+### `slow-query-file`
 
-+ 日志截断间隔时间，如果为0则不截断。
++ 慢查询日志的文件名。
++ 默认值："tidb-slow.log"，注：由于 TiDB V2.1.8 更新了慢日志格式，所以将慢日志单独输出到了慢日志文件。V2.1.8 之前的版本，该变量的默认值值是 ""。
++ 设置后，慢查询日志会单独输出到该文件。
+
+### `slow-threshold`
+
++ 输出慢日志的耗时阈值。
++ 默认值：300ms
++ 当查询大于这个值，就会当做是一个慢查询，输出到慢查询日志。
+
+### `expensive-threshold`
+
++ 输出 `expensive` 操作的行数阈值。
++ 默认值：10000
++ 当查询的行数（包括中间结果，基于统计信息）大于这个值，我们就会当成是一个 `expensive` 的操作，输出一个前缀带有 `[EXPENSIVE_QUERY]` 的日志。
+
+### `query-log-max-len`
+
++ 最长的 SQL 输出长度。
++ 默认值：2048
++ 当语句的长度大于 `query-log-max-len`，将会被截断输出。
+
+## log.file
+
+日志文件相关的配置项。
+
+#### `filename`
+
++ 一般日志文件名字。
++ 默认值：""
++ 如果设置，会输出一般日志到这个文件。
+
+#### `max-size`
+
++ 日志文件的大小限制。
++ 默认值：300MB
++ 最大设置上限为 4GB。
+
+#### `max-days`
+
++ 日志最大保留的天数。
 + 默认值：0
++ 默认值是不清理的，如果设置了，在 `max-days` 之后 TiDB 会清理过期的日志文件。
 
-### `info-log-keep-log-file-num`
+#### `max-backups`
 
-+ 保留日志文件最大个数。
-+ 默认值：10
-+ 最小值：0
++ 保留的日志的最大数量。
++ 默认值：0
++ 默认值全部保存，如果设置为 7，会最多保留 7 个老的日志文件。
 
-### `info-log-dir`
+#### `log-rotate`
 
-+ 日志存储目录。
++ 是否每日创建一个新的日志文件。
++ 默认值：true
++ 如果设置为 true，每天会新建新的日志文件，如果设置为 false，那么只会输出到一个日志文件。
+
+## security
+
+安全相关配置。
+
+### `ssl-ca`
+
++ PEM 格式的受信任 CA 的证书文件路径。
++ 默认值：""
++ 当同时设置了该选项和 `--ssl-cert`、`--ssl-key` 选项时，TiDB 将在客户端出示证书的情况下根据该选项指定的受信任的 CA 列表验证客户端证书。若验证失败，则连接会被终止。
++ 即使设置了该选项，若客户端没有出示证书，则安全连接仍然继续，不会进行客户端证书验证。
+
+### `ssl-cert`
+
++ PEM 格式的 SSL 证书文件路径。
++ 默认值：""
++ 当同时设置了该选项和 `--ssl-key` 选项时，TiDB 将接受（但不强制）客户端使用 TLS 安全地连接到 TiDB。
++ 若指定的证书或私钥无效，则 TiDB 会照常启动，但无法接受安全连接。
+
+### `ssl-key`
+
++ PEM 格式的 SSL 证书密钥文件路径，即 `--ssl-cert` 所指定的证书的私钥。
++ 默认值：""
++ 目前 TiDB 不支持加载由密码保护的私钥。
+
+### `cluster-ssl-ca`
+
++ CA 根证书，用于用 tls 连接 TiKV/PD
 + 默认值：""
 
-## rocksdb.titan
+### `cluster-ssl-cert`
 
-Titan 相关的配置项。
++ ssl 证书文件路径，用于用 tls 连接 TiKV/PD
++ 默认值：""
+
+### `cluster-ssl-key`
+
++ ssl 私钥文件路径，用于用 tls 连接 TiKV/PD
++ 默认值：""
+
+### `skip-grant-table`
+
++ 是否跳过权限检查
++ 默认值：false
+
+## performance
+
+性能相关配置。
+
+### `max-procs`
+
++ TiDB 的 CPU 使用数量。
++ 默认值：0
++ 默认值为 0 表示使用机器上所有的 CPU，也可以设置成 n，那么 TiDB 会使用 n 个 CPU 数量。
+
+### `max-memory`
+
++ Prepare cache LRU 使用的最大内存限制，超过 performance.max-memory * (1 - prepared-plan-cache.memory-guard-ratio)会 剔除 LRU 中的元素。
++ 默认值：0
++ 这个配置只有在 prepared-plan-cache.enabled 为 true 的情况才会生效。在 LRU 的 size 大于 prepared-plan-cache.capacity 的情况下，也会剔除 LRU 中的元素。
+
+### `stmt-count-limit`
+
++ TiDB 一个事务允许的最大语句条数限制。
++ 默认值：5000
++ 在一个事务中，超过 `stmt-count-limit` 条语句后还没有 rollback 或者 commit，TiDB 将会返回 `statement count 5001 exceeds the transaction limitation, autocommit = false` 错误。
+
+### `tcp-keep-alive`
+
++ TiDB 在 TCP 层开启 keepalive。
++ 默认值：false
+
+### `retry-limit`
+
++ TiDB 在提交事务的时候遇到 key 冲突或者其他错误时进行的重试次数。
++ 默认值：10
++ 如果 TiDB 超过 `retry-limit` 次重试还是没有成功，将会返回错误。
+
+### `cross-join`
+
++ 默认值：true
++ 在做 join 的时候，两边表没有任何条件（where 字段），默认值可以执行这样的语句。但是设置为 false，则如有这样的 join 语句出现，server 会拒绝执行
+
+### `stats-lease`
+
++ TiDB 重载统计信息，更新表行数，检查是否需要自动 analyze，利用 feedback 更新统计信息以及加载列的统计信息的时间间隔。
++ 默认值：3s 
+    - 每隔 `stats-lease` 时间，TiDB 会检查统计信息是否有更新，如果有会将其更新到内存中
+    - 每隔 `20 * stats-lease` 时间，TiDB 会将 DML 产生的总行数以及修改的行数变化更新到系统表中
+    - 每隔 `stats-lease` 时间，TiDB 会检查是否有表或者索引需要自动 analyze
+    - 每隔 `stats-lease` 时间，TiDB 会检查是否有列的统计信息需要被加载到内存中
+    - 每隔 `200 * stats-lease` 时间，TiDB 会将内存中缓存的 feedback 写入系统表中
+    - 每隔 `5 * stats-lease` 时间，TiDB 会读取系统表中的 feedback，更新内存中缓存的统计信息
+- 当 `stats-lease` 为 0 时，TiDB 会以 3s 的时间间隔周期性的读取系统表中的统计信息并更新内存中缓存的统计信息。但不会自动修改统计信息相关系统表，具体来说，TiDB 不再自动修改这些表： 
+    - `mysql.stats_meta`：TiDB 不再自动记录事务中对某张表的修改行数，也不会更新到这个系统表中
+    - `mysql.stats_histograms`/`mysql.stats_buckets` 和 `mysql.stats_top_n`：TiDB 不再自动 analyze 和主动更新统计信息
+    - `mysql.stats_feedback`：TiDB 不再根据被查询的数据反馈的部分统计信息更新表和索引的统计信息，analyze 以及 feedback 等操作都不会再进行。
+
+### `run-auto-analyze`
+
++ TiDB 是否做自动的 Analyze。
++ 默认值：true
+
+### `feedback-probability`
+
++ TiDB 对查询收集统计信息反馈的概率。
++ 默认值：0.05
++ 对于每一个查询，TiDB 会以 `feedback-probability` 的概率收集查询的反馈，用于更新统计信息。
+
+### `query-feedback-limit`
+
++ 在内存中缓存的最大 Query Feedback 数量，超过这个数量的 Feedback 会被丢弃。
++ 默认值：1024
+
+### `pseudo-estimate-ratio`
+
++ 修改过的行数/表的总行数的比值，超过该值时系统会认为统计信息已经过期，会采用 pseudo 的统计信息。
++ 默认值：0.8
++ 最小值为 0；最大值为 1。
+
+### `force-priority`
+
++ 把所有的语句优先级设置为 force-priority 的值。
++ 默认值：NO_PRIORITY
++ 可选值：NO_PRIORITY, LOW_PRIORITY, HIGH_PRIORITY, DELAYED。
+
+## prepared-plan-cache
+
+prepare 语句的 Plan cache 设置。
 
 ### `enabled`
 
-+ 开启或关闭 Titan。
++ 开启 prepare 语句的 plan cache。
 + 默认值：false
 
-### `dirname`
+### `capacity`
 
-+ Titan Blob 文件存储目录。
-+ 默认值：titandb
++ 缓存语句的数量。
++ 默认值：100
 
-### `disable-gc`
+### `memory-guard-ratio`
 
-+ 控制是否关闭 Titan 对 Blob 文件的 GC。
-+ 默认值：false
-
-### `max-background-gc`
-
-+ Titan 后台 GC 的线程个数。
-+ 默认值：1
-+ 最小值：1
-
-## rocksdb.defaultcf
-
-rocksdb defaultcf 相关的配置项。
-
-### `block-size`
-
-+ 设置 rocksdb block 大小。
-+ 默认值：64KB
-+ 最小值：1KB
-+ 单位：KB|MB|GB
-
-### `block-cache-size`
-
-+ 设置 rocksdb block 缓存大小。
-+ 默认值：机器总内存 / 4
-+ 最小值：0
-+ 单位：KB|MB|GB
-
-### `disable-block-cache`
-
-+ 开启或关闭 block cache。
-+ 默认值：false
-
-### `cache-index-and-filter-blocks`
-
-+ 开启或关闭缓存 index 和 filter。
-+ 默认值：true
-
-### `pin-l0-filter-and-index-blocks`
-
-+ 是否 pin 住 L0 的 index 和 filter。
-+ 默认值：true
-
-### `use-bloom-filter`
-
-+ 开启 bloom filter 的开关。
-+ 默认值：true
-
-### `optimize-filters-for-hits`
-
-+ 开启优化 filter 的命中率的开关。
-+ 默认值：true
-
-### `whole_key_filtering`
-
-+ 开启将整个 key 放到 bloom filter 中的开关。
-+ 默认值：true
-
-### `bloom-filter-bits-per-key`
-
-bloom filter 为每个 key 预留的长度。
-
-+ 默认值：10
-+ 单位：字节
-
-### `block-based-bloom-filter`
-
-+ 开启每个 block 建立 bloom filter 的开关。
-+ 默认值：false
-
-### `read-amp-bytes-per-bit`
-
-+ 开启读放大统计的开关，0：不开启，> 0 开启。
-+ 默认值：0
-+ 最小值：0
-
-### `compression-per-level`
-
-+ 每一层默认压缩算法，默认：前两层为 No，后面 5 层为 lz4。
-+ 默认值：["no", "no", "lz4", "lz4", "lz4", "zstd", "zstd"]
-
-### `write-buffer-size`
-
-+ memtable 大小。
-+ 默认值：128MB
-+ 最小值：0
-+ 单位：KB|MB|GB
-
-### `max-write-buffer-number`
-
-+ 最大 memtable 个数。
-+ 默认值：5
-+ 最小值：0
-
-### `min-write-buffer-number-to-merge`
-
-+ 触发 flush 的最小 memtable 个数。
-+ 默认值：1
-+ 最小值：0
-
-### `max-bytes-for-level-base`
-
-+ base level (L1) 最大字节数，一般设置为 memtable 大小 4 倍。
-+ 默认值：512MB
-+ 最小值：0
-+ 单位：KB|MB|GB
-
-### `target-file-size-base`
-
-+ base level 的目标文件大小。
-+ 默认值：8MB
-+ 最小值：0
-+ 单位：KB|MB|GB
-
-### `level0-file-num-compaction-trigger`
-
-+ 触发 compaction 的 L0 文件最大个数。
-+ 默认值：4
-+ 最小值：0
-
-### `level0-slowdown-writes-trigger`
-
-+ 触发 write stall 的 L0 文件最大个数。
-+ 默认值：20
-+ 最小值：0
-
-### `level0-stop-writes-trigger`
-
-+ 完全阻停写入的 L0 文件最大个数。
-+ 默认值：36
-+ 最小值：0
-
-### `max-compaction-bytes`
-
-+ 一次 compaction 最大写入字节数，默认 2GB。
-+ 默认值：2GB
-+ 最小值：0
-+ 单位：KB|MB|GB
-
-### `compaction-pri`
-
-Compaction 优先类型，默认：3（MinOverlappingRatio），0（ByCompensatedSize）， 1（OldestLargestSeqFirst），2（OldestSmallestSeqFirst）。
-
-+ 默认值：3
-
-### `dynamic-level-bytes`
-
-+ 开启 dynamic level bytes 优化的开关。
-+ 默认值：true
-
-### `num-levels`
-
-+ RocksDB 文件最大层数。
-+ 默认值：7
-
-### `max-bytes-for-level-multiplier`
-
-+ 每一层的默认放大倍数。
-+ 默认值：10
-
-### `rocksdb.defaultcf.compaction-style`
-
-+ Compaction 方法，可选值为 level，universal。
-+ 默认值：level
-
-### `disable-auto-compactions`
-
-+ 开启自动 compaction 的开关。
-+ 默认值：false
-
-### `soft-pending-compaction-bytes-limit`
-
-+ pending compaction bytes 的软限制。
-+ 默认值：64GB
-+ 单位：KB|MB|GB
-
-### `hard-pending-compaction-bytes-limit`
-
-+ pending compaction bytes 的硬限制。
-+ 默认值：256GB
-+ 单位：KB|MB|GB
-
-## rocksdb.defaultcf.titan
-
-rocksdb defaultcf titan 相关的配置项。
-
-### `min-blob-size`
-
-+ 最小存储在 Blob 文件中 value 大小，低于该值的 value 还是存在 LSM-Tree 中。
-+ 默认值：1KB
-+ 最小值：0
-+ 单位：KB|MB|GB
-
-### `blob-file-compression`
-
-+ Blob 文件所使用的压缩算法，可选值：no, snappy, zlib, bzip2, lz4, lz4hc, zstd。
-+ 默认值：lz4
-
-### `blob-cache-size`
-
-+ Blob 文件的 cache 大小，默认：0GB。
-+ 默认值：0GB
-+ 最小值：0
-+ 单位：KB|MB|GB
-
-### `min-gc-batch-size`
-
-+ 做一次 GC 所要求的最低 Blob 文件大小总和。
-+ 默认值：16MB
-+ 最小值：0
-+ 单位：KB|MB|GB
-
-### `max-gc-batch-size`
-
-+ 做一次 GC 所要求的最高 Blob 文件大小总和。
-+ 默认值：64MB
-+ 最小值：0
-+ 单位：KB|MB|GB
-
-### `discardable-ratio`
-
-+ Blob 文件 GC 的触发比例，如果某 Blob 文件中的失效 value 的比例高于该值才可能被 GC 选中。
-+ 默认值：0.5
-+ 最小值：0
-+ 最大值：1
-
-### `sample-ratio`
-
-+ 进行 GC 时，对 Blob 文件进行采样时读取数据占整个文件的比例。
++ 用于防止超过 performance.max-memory, 超过 max-proc * (1 - prepared-plan-cache.memory-guard-ratio)会剔除 LRU 中的元素。
 + 默认值：0.1
-+ 最小值：0
-+ 最大值：1
++ 最小值为 0；最大值为 1。
 
-### `merge-small-file-threshold`
+## tikv-client
 
-+ Blob 文件的大小小于该值时，无视 discardable-ratio 仍可能被 GC 选中。
-+ 默认值：8MB
-+ 最小值：0
-+ 单位：KB|MB|GB
+### `grpc-connection-count`
 
-## rocksdb.writecf
++ 跟每个 TiKV 之间建立的最大连接数。
++ 默认值：16
 
-rocksdb writecf 相关的配置项。
+### `grpc-keepalive-time`
 
-### `block-cache-size`
++ TiDB 与 TiKV 节点之间 rpc 连接 keepalive 时间间隔，如果超过该值没有网络包，grpc client 会 ping 一下 TiKV 查看是否存活。
++ 默认值：10
++ 单位：秒
 
-+ block cache size。
-+ 默认值：机器总内存 * 15%
-+ 单位：MB|GB
+### `grpc-keepalive-timeout`
 
-### `optimize-filters-for-hits`
++ TiDB 与 TiKV 节点 rpc keepalive 检查的超时时间
++ 默认值：3
++ 单位：秒
 
-+ 开启优化 filter 的命中率的开关。
-+ 默认值：false
+### `commit-timeout`
 
-### `whole-key-filtering`
++ 执行事务提交时，最大的超时时间。
++ 默认值：41s
++ 这个值必须是大于两倍 Raft 选举的超时时间。
 
-+ 开启将整个 key 放到 bloom filter 中的开关。
-+ 默认值：false
+### `max-txn-time-use`
 
-## rocksdb.lockcf
++ 单个事务允许的最大执行时间。
++ 默认值：590
++ 单位：秒
 
-rocksdb lockcf 相关配置项。
+### `max-batch-size`
 
-### `block-cache-size`
++ 批量发送 rpc 封包的最大数量，如果不为 0，将使用 BatchCommands api 发送请求到 TiKV，可以在并发度高的情况降低 rpc 的延迟，推荐不修改该值。
++ 默认值：128
 
-+ block cache size。
-+ 默认值：机器总内存 * 2%
-+ 单位：MB|GB
+### `max-batch-wait-time`
 
-### `optimize-filters-for-hits`
++ 等待 `max-batch-wait-time` 纳秒批量将此期间的数据包封装成一个大包发送给 TiKV 节点，仅在 `tikv-client.max-batch-size` 值大于 0 时有效，不推荐修改该值。
++ 默认值：0
++ 单位：纳秒
 
-+ 开启优化 filter 的命中率的开关。
-+ 默认值：false
+### `batch-wait-size`
 
-### `level0-file-num-compaction-trigger`
-
-+ 触发 compaction 的 L0 文件个数。
-+ 默认值：1
-
-## raftdb
-
-raftdb 相关配置项。
-
-### `max-background-jobs`
-
-+ RocksDB 后台线程个数。
-+ 默认值：2
-+ 最小值：1
-
-### `max-sub-compactions`
-
-+ RocksDB 进行 subcompaction 的并发数。
-+ 默认值：1
-+ 最小值：1
-
-### `wal-dir`
-
-+ WAL 存储目录。
-+ 默认值：/tmp/tikv/store
-
-## import
-
-import 相关的配置项。
-
-### `num-threads`
-
-+ 处理 RPC 请求线程数。
++ 批量向 TiKV 发送的封包最大数量，不推荐修改该值。
 + 默认值：8
-+ 最小值：1
++ 若此值为 0 表示关闭此功能。
 
-### `num-import-jobs`
+### `overload-threshold`
 
-+ 并发导入工作任务数。
-+ 默认值：8
-+ 最小值：1
++ TiKV 的负载阈值，如果超过此阈值，会收集更多的 batch 封包，来减轻 TiKV 的压力。仅在 `tikv-client.max-batch-size` 值大于 0 时有效，不推荐修改该值。
++ 默认值：200
+
+## txn-local-latches
+
+事务内存锁相关配置，当本地事务冲突比较多时建议开启。
+
+### `enable`
+
++ 开启
++ 默认值：false
+
+### `capacity`
+
++ Hash 对应的 slot 数，会自动向上调整为 2 的指数倍。每个 slot 占 32 Bytes 内存。当写入数据的范围比较广时（如导数据），设置过小会导致变慢，性能下降。
++ 默认值：1024000
+
+## binlog
+
+TiDB Binlog 相关配置。
+
+### `enable`
+
++ 开启 binlog 开关。
++ 默认值：false
+
+### `write-timeout`
+
++ 写 binlog 的超时时间，推荐不修改该值。
++ 默认值：15s
++ 单位：秒
+
+### `ignore-error`
+
++ 忽略写 binlog 发生的错误时处理开关，推荐不修改该值。
++ 默认值：false
++ "true"，发生错误时，停止写入 binlog, 并且在监控项 tidb_server_critical_error_total 上计数加1；"false": 写入 binlog 失败，会停止整个 TiDB 的服务。
+
+### `binlog-socket`
+
++ binlog 输出网络地址。
++ 默认值：""
+
+### `strategy`
+
++ binlog 输出时选择 pump 的策略，仅支持 hash ，range 方法。
++ 默认值："range"
+
+## status
+
+TiDB 服务状态相关配置。
+
+### `record-db-qps`
+
++ 输与 database 相关的 QPS metrics 到 promethus的开关。
++ 默认值：false
