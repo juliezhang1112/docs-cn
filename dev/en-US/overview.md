@@ -1,15 +1,28 @@
 ---
-title: 数据类型概述
-category: reference
+title: TiDB 监控框架概述
+category: how-to
 ---
 
-# 数据类型概述
+# TiDB 监控框架概述
 
-TiDB 支持除空间类型 (`SPATIAL`) 之外的所有 MySQL 数据类型，包括[数值型类型](/reference/sql/data-types/numeric.md)、[字符串类型](/reference/sql/data-types/string.md)、[时间和日期类型](/reference/sql/data-types/date-and-time.md)、[JSON 类型](/reference/sql/data-types/json.md)。
+TiDB 使用开源时序数据库 [Prometheus](https://prometheus.io) 作为监控和性能指标信息存储方案，使用 [Grafana](https://grafana.com/grafana) 作为可视化组件进行展示。
 
-数据类型定义一般为 `T(M[, D])`，其中：
+## Prometheus 在 TiDB 中的应用
 
-* `T` 表示具体的类型。
-* `M` 在整数类型中表示最大显示长度；在浮点数或者定点数中表示精度；在字符类型中表示最大长度。`M` 的最大值取决于具体的类型。
-* `D` 表示浮点数、定点数的小数位长度。
-* `fsp` 在时间和日期类型里的 `TIME`、`DATETIME` 以及 `TIMESTAMP` 中表示秒的精度，其取值范围是 0 到 6。值为 0 表示没有小数部分。如果省略，则默认精度为 0。
+Prometheus 是一个拥有多维度数据模型的、灵活的查询语句的时序数据库。Prometheus 作为热门的开源项目，拥有活跃的社区及众多的成功案例。
+
+Prometheus 提供了多个组件供用户使用。目前，TiDB 使用了以下组件：
+
+- Prometheus Server：用于收集和存储时间序列数据。
+- Client 代码库：用于定制程序中需要的 Metric。
+- Alertmanager：用于实现报警机制。
+
+其结构如下图所示：
+
+![Prometheus in TiDB](/media/prometheus-in-tidb.png)
+
+## Grafana 在 TiDB 中的应用
+
+Grafana 是一个开源的 metric 分析及可视化系统。TiDB 使用 Grafana 来展示 TiDB 的各项性能指标。如下图所示：
+
+![Grafana in TiDB](/media/grafana-screenshot.png)
