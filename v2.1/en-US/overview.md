@@ -1,70 +1,99 @@
 ---
-title: 跨数据中心部署方案
-category: how-to
+title: Data Migration 简介
+category: reference
 ---
 
-# 跨数据中心部署方案
+# Data Migration 简介
 
-作为 NewSQL 数据库，TiDB 兼顾了传统关系型数据库的优秀特性以及 NoSQL 数据库可扩展性，以及跨数据中心（下文简称“中心”）场景下的高可用。本文档旨在介绍跨数据中心部署的不同解决方案。
+[DM](https://github.com/pingcap/dm) (Data Migration) 是一体化的数据同步任务管理平台，支持从 MySQL 或 MariaDB 到 TiDB 的全量数据迁移和增量数据同步。使用 DM 工具有利于简化错误处理流程，降低运维成本。
 
-## 三中心部署方案
+## DM 架构
 
-TiDB, TiKV, PD 分别分布在 3 个不同的中心，这是最常规，可用性最高的方案。
+DM 主要包括三个组件：DM-master，DM-worker 和 dmctl。
 
-![三中心部署](/media/deploy-3dc.png)
+![Data Migration architecture](/media/dm-architecture.png)
 
-### 优点
+### DM-master
 
-所有数据的副本分布在三个数据中心，任何一个数据中心失效后，另外两个数据中心会自动发起 leader election，并在合理长的时间内（通常情况 20s 以内）恢复服务，并且不会产生数据丢失。
+DM-master 负责管理和调度数据同步任务的各项操作。
 
-![三中心部署容灾](/media/deploy-3dc-dr.png)
+- 保存 DM 集群的拓扑信息
+- 监控 DM-worker 进程的运行状态
+- 监控数据同步任务的运行状态
+- 提供数据同步任务管理的统一入口
+- 协调分库分表场景下各个实例分表的 DDL 同步
 
-### 缺点
+### DM-worker
 
-性能受网络延迟影响。
+DM-worker 负责执行具体的数据同步任务。
 
-- 对于写入的场景，所有写入的数据需要同步复制到至少 2 个数据中心，由于 TiDB 写入过程使用两阶段提交，故写入延迟至少需要 2 倍数据中心间的延迟。
-- 对于读请求来说，如果数据 leader 与发起读取的 TiDB 节点不在同一个数据中心，也会受网络延迟影响。
-- TiDB 中的每个事务都需要向 PD leader 获取 TSO，当 TiDB 与 PD leader 不在同一个数据中心时，它上面运行的事务也会因此受网络延迟影响，每个有写入的事务会获取两次 TSO。
+- 将 binlog 数据持久化保存在本地
+- 保存数据同步子任务的配置信息
+- 编排数据同步子任务的运行
+- 监控数据同步子任务的运行状态
 
-### 读性能优化
+DM-worker 启动后，会自动同步上游 binlog 至本地配置目录（如果使用 DM-Ansible 部署 DM 集群，默认的同步目录为 `<deploy_dir>/relay_log`）。关于 DM-worker，详见 [DM-worker 简介](/reference/tools/data-migration/dm-worker-intro.md)。关于 relay log，详见 [DM Relay Log](/reference/tools/data-migration/relay-log.md)。
 
-如果不需要每个数据中心同时对外提供服务，可以将业务流量全部派发到一个数据中心，并通过调度策略把 Region leader 和 PD leader 都迁移到同一个数据中心（我们在上文所述的测试中也做了这个优化）。这样一来，不管是从 PD 获取 TSO 还是读取 Region 都不受数据中心间网络的影响。当该数据中心失效后，PD leader 和 Region leader 会自动在其它数据中心选出，只需要把业务流量转移至其他存活的数据中心即可。
+### dmctl
 
-![三中心部署读性能优化](/media/deploy-3dc-optimize.png)
+dmctl 是用来控制 DM 集群的命令行工具。
 
-## 两地三中心部署方案
+- 创建、更新或删除数据同步任务
+- 查看数据同步任务状态
+- 处理数据同步任务错误
+- 校验数据同步任务配置的正确性
 
-两地三中心的方案与三数据中心类似，算是三机房方案根据业务特点进行的优化，区别是其中有两个数据中心距离很近（通常在同一个城市），网络延迟相对很小。这种场景下，我们可以把业务流量同时派发到同城的两个数据中心，同时控制 Region leader 和 PD leader 也分布在同城的两个数据中心。
+## 同步功能介绍
 
-![两地三中心部署方案](/media/deploy-2city3dc.png)
+下面简单介绍 DM 数据同步功能的核心特性。
 
-与三数据中心方案相比，两地三中心有以下优势：
+### Table routing
 
-- 写入速度更优
-- 两中心同时提供服务资源利用率更高
-- 依然能保证任何一个数据中心失效后保持可用并且不发生数据丢失
+[Table routing](/reference/tools/data-migration/features/overview.md#table-routing) 是指将上游 MySQL 或 MariaDB 实例的某些表同步到下游指定表的路由功能，可以用于分库分表的合并同步。
 
-但是，缺陷是如果同城的两个数据中心同时失效（理论上讲要高于异地三数据中心损失 2 个的概率），将会导致不可用以及部分数据丢失。
+### Black & white table lists
 
-## 两数据中心 + binlog 同步方案
+[Black & white table lists](/reference/tools/data-migration/features/overview.md#black-white-table-lists) 是指上游数据库实例表的黑白名单过滤规则。其过滤规则类似于 MySQL `replication-rules-db`/`replication-rules-table`，可以用来过滤或只同步某些数据库或某些表的所有操作。
 
-两数据中心 + binlog 同步类似于传统的 MySQL 中 master/slave 方案。两个数据中心分别部署一套完整的 TiDB 集群，我们称之为主集群和从集群。正常情况下所有的请求都在主集群，写入的数据通过 binlog 异步同步至从集群并写入。
+### Binlog event filter
 
-![binlog 同步部署方案](/media/deploy-binlog.png)
+[Binlog event filter](/reference/tools/data-migration/features/overview.md#binlog-event-filter) 是比库表同步黑白名单更加细粒度的过滤规则，可以指定只同步或者过滤掉某些 `schema`/`table` 的指定类型的 binlog events，比如 `INSERT`，`TRUNCATE TABLE`。
 
-当主集群整个数据中心失效后，业务可以切换至从集群，与 MySQL 类似，这种情况下会有一些数据缺失。对比 MySQL，这个方案的优势是数据中心内的 HA -- 少部分节点故障时，通过重新选举 leader 自动恢复服务，不需要人工干预。
+### Column mapping
 
-![两中心 binlog 相互备份方案](/media/deploy-backup.png)
+[Column mapping](/reference/tools/data-migration/features/overview.md#column-mapping) 是指根据用户指定的内置表达式对表的列进行转换，可以用来解决分库分表合并时自增主键 ID 的冲突。
 
-另外部分用户采用这种方式做双数据中心多活，两个数据中心各有一个集群，将业务分为两个库，每个库服务一部分数据，每个数据中心的业务只会访问一个库，两个集群之间通过 binlog 将本数据中心业务所涉及的库中的数据变更同步到对端机房，形成环状备份。
+### Shard support
 
-> **注意：**
-> 
-> 在两数据中心 + binlog 同步部署方案中，数据中心之间只有 binlog 异步复制。在数据中心间的延迟较高的情况下，从集群落后主集群的数据量会增大。当主集群故障后（DR），会造成数据丢失，丢失的数据量受网络延迟等因素影响。
+DM 支持对原分库分表进行合库合表操作，但需要满足一些[使用限制](/reference/tools/data-migration/features/shard-merge.md#使用限制)。
 
-## 高可用和容灾分析
+## 使用限制
 
-对于三数据中心方案和两地三中心方案，我们能得到的保障是任意一个数据中心故障时，集群能自动恢复服务，不需要人工介入，并能保证数据一致性。注意各种调度策略都是用于帮助性能优化的，当发生故障时调度机制总是第一优先考虑可用性而不是性能。
+在使用 DM 工具之前，需了解以下限制：
 
-对于两数据中心 + binlog 同步的方案，主集群内少量节点故障时也能自动恢复服务，不需要人工介入，并能保证数据一致性。当整个主集群故障时，需要人工切换至从集群，并可能发生一些数据丢失，数据丢失的数量取决于同步延迟，和网络条件有关。
++ 数据库版本
+    
+    - 5.5 < MySQL 版本 < 5.8
+    - MariaDB 版本 >= 10.1.2
+    
+    > **注意：**
+    > 
+    > 如果上游 MySQL/MariaDB server 间构成主从复制结构，则
+    > 
+    > - 5.7.1 < MySQL 版本 < 5.8
+    > - MariaDB 版本 >= 10.1.3
+    
+    在使用 dmctl 启动任务时，DM 会自动对任务上下游数据库的配置、权限等进行[前置检查](/reference/tools/data-migration/precheck.md)。
+
+- DDL 语法
+    
+    - 目前，TiDB 部分兼容 MySQL 支持的 DDL 语句。因为 DM 使用 TiDB parser 来解析处理 DDL 语句，所以目前仅支持 TiDB parser 支持的 DDL 语法。
+    - DM 遇到不兼容的 DDL 语句时会报错。要解决此报错，需要使用 dmctl 手动处理，要么跳过该 DDL 语句，要么用指定的 DDL 语句来替换它。
+- 分库分表
+    
+    - 如果业务分库分表之间存在数据冲突，冲突的列**只有自增主键列**，并且**列的类型是 bigint**，可以尝试使用 [Column mapping](/reference/tools/data-migration/features/overview.md#column-mapping) 来解决；否则不推荐使用 DM 进行同步，如果进行同步则有冲突的数据会相互覆盖造成数据丢失。
+    - 关于分库分表合并场景的其它限制，参见[使用限制](/reference/tools/data-migration/features/shard-merge.md#使用限制)。
+- 操作限制
+    
+    - DM-worker 重启后不能自动恢复数据同步任务，需要使用 dmctl 手动执行 `start-task`。详见[管理数据同步任务](/reference/tools/data-migration/manage-tasks.md)。
+    - 在一些情况下，DM-worker 重启后不能自动恢复 DDL lock 同步，需要手动处理。详见[手动处理 Sharding DDL Lock](/reference/tools/data-migration/features/manually-handling-sharding-ddl-locks.md)。
