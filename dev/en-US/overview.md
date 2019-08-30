@@ -1,99 +1,40 @@
 ---
-title: TiDB 事务语句
+title: DM 配置简介
 category: reference
 ---
 
-# TiDB 事务语句
+# DM 配置简介
 
-TiDB 支持分布式事务。涉及到事务的语句包括 `autocommit` 变量、`[BEGIN|START TRANSACTION]`、`COMMIT` 以及 `ROLLBACK`。
+本文档简要介绍 DM (Data Migration) 的配置文件和数据同步任务的配置。
 
-## 自动提交
+## 配置文件
 
-语法：
+- `inventory.ini`：使用 DM-Ansible 部署 DM 集群的配置文件。需要根据所选用的集群拓扑来进行编辑。详见[编辑 `inventory.ini` 配置文件](/how-to/deploy/data-migration-with-ansible.md#第-7-步-编辑-inventory-ini-配置文件)。
+- `dm-master.toml`：DM-master 进程的配置文件，包括 DM 集群的拓扑信息、MySQL 实例与 DM-worker 之间的关系（必须为一对一的关系）。使用 DM-Ansible 部署 DM 集群时，会自动生成 `dm-master.toml` 文件。
+- `dm-worker.toml`：DM-worker 进程的配置文件，包括上游 MySQL 实例的配置和 relay log 的配置。使用 DM-Ansible 部署 DM 集群时，会自动生成 `dm-worker.toml` 文件。
 
-```sql
-SET autocommit = {0 | 1}
-```
+## 同步任务配置
 
-通过设置 `autocommit` 的值为 1，可以将当前 Session 设置为自动提交状态，0 则表示当前 Session 为非自动提交状态。默认情况下，`autocommit` 的值为 1。
+### 任务配置文件
 
-在自动提交状态，每条语句运行后，会将其修改自动提交到数据库中。否则，会等到运行 `COMMIT` 语句或者是某些会造成隐式提交的情况，详见 [implicit commit](https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html)。比如，执行 `[BEGIN|START TRANCATION]` 语句的时候会试图提交上一个事务，并开启一个新的事务。
+使用 DM-Ansible 部署 DM 集群时，`<path-to-dm-ansible>/conf` 中提供了任务配置文件模板：`task.yaml.exmaple` 文件。该文件是 DM 同步任务配置的标准文件，每一个具体的任务对应一个 `task.yaml` 文件。关于该配置文件的详细介绍，参见 [任务配置文件](/reference/tools/data-migration/configure/task-configuration-file.md)。
 
-另外 `autocommit` 也是一个 System Variable，所以可以通过变量赋值语句修改当前 Session 或者是 Global 的值。
+### 创建数据同步任务
 
-```sql
-SET @@SESSION.autocommit = {0 | 1};
-SET @@GLOBAL.autocommit = {0 | 1};
-```
+你可以基于 `task.yaml.example` 文件来创建数据同步任务，具体步骤如下：
 
-## START TRANSACTION, BEGIN
+1. 复制 `task.yaml.example` 为 `your_task.yaml`。
+2. 参考[任务配置文件](/reference/tools/data-migration/configure/task-configuration-file.md)来修改 `your_task.yaml` 文件。
+3. [使用 dmctl 创建数据同步任务](/reference/tools/data-migration/manage-tasks.md#创建数据同步任务)。
 
-语法:
+### 关键概念
 
-```sql
-BEGIN;
+DM 配置的关键概念如下：
 
-START TRANSACTION;
-
-START TRANSACTION WITH CONSISTENT SNAPSHOT;
-```
-
-上述三条语句都是事务开始语句，效果相同。通过事务开始语句可以显式地开始一个新的事务，如果这个时候当前 Session 正在一个事务中间过程中，会将当前事务提交后，开启一个新的事务。
-
-## COMMIT
-
-语法：
-
-```sql
-COMMIT;
-```
-
-提交当前事务，包括从 `[BEGIN|START TRANSACTION]` 到 `COMMIT` 之间的所有修改。
-
-## ROLLBACK
-
-语法：
-
-```sql
-ROLLBACK;
-```
-
-回滚当前事务，撤销从 `[BEGIN|START TRANSACTION]` 到 `ROLLBACK` 之间的所有修改。
-
-## 显式事务和隐式事务
-
-TiDB 可以显式地使用事务（`[BEGIN|START TRANSACTION]`/`COMMIT`）或者隐式的使用事务（`SET autocommit = 1`）。
-
-如果在 `autocommit = 1` 的状态下，通过 `[BEGIN|START TRANSACTION]` 语句开启一个新的事务，那么在 `COMMIT`/`ROLLBACK` 之前，会禁用 autocommit，也就是变成显式事务。
-
-对于 DDL 语句，会自动提交并且不能回滚。如果运行 DDL 的时候，正在一个事务的中间过程中，会先将当前的事务提交，再执行 DDL。
-
-## 事务隔离级别
-
-TiDB **只支持** `SNAPSHOT ISOLATION`，可以通过下面的语句将当前 Session 的隔离级别设置为 `READ COMMITTED`，这只是语法上的兼容，事务依旧是以 `SNAPSHOT ISOLATION` 来执行。
-
-```sql
-SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
-```
-
-## 事务的惰性检查
-
-TiDB 中，对于普通的 `INSERT` 语句写入的值，会进行惰性检查。惰性检查的含义是，不在 `INSERT` 语句执行时进行唯一约束的检查，而在事务提交时进行唯一约束的检查。
-
-举例：
-
-```sql
-CREATE TABLE T (I INT KEY);
-INSERT INTO T VALUES (1);
-BEGIN;
-INSERT INTO T VALUES (1); -- MySQL 返回错误；TiDB 返回成功
-INSERT INTO T VALUES (2);
-COMMIT; -- MySQL 提交成功；TiDB 返回错误，事务回滚
-SELECT * FROM T; -- MySQL 返回 1 2；TiDB 返回 1
-```
-
-惰性检查的意义在于，如果对事务中每个 `INSERT` 语句都立刻进行唯一性约束检查，将造成很高的网络开销。而在提交时进行一次批量检查，将会大幅提升性能。
-
-> **注意：**
-> 
-> 本优化对于 `INSERT IGNORE` 和 `INSERT ON DUPLICATE KEY UPDATE` 不会生效，仅对与普通的 `INSERT` 语句生效。
+| 概念           | 解释                                                        | 配置文件                                                                                         |
+|:------------ |:--------------------------------------------------------- |:-------------------------------------------------------------------------------------------- |
+| source-id    | 唯一确定一个 MySQL 或 MariaDB 实例，或者一个具有主从结构的复制组，字符串长度不大于 32      | `inventory.ini` 的 `source_id`；  
+`dm-master.toml` 的 `source-id`；  
+`task.yaml` 的 `source-id` |
+| DM-worker ID | 唯一确定一个 DM-worker（取值于 `dm-worker.toml` 的 `worker-addr` 参数） | `dm-worker.toml` 的 `worker-addr`；  
+dmctl 命令行的 `-worker` / `-w` flag                         |
