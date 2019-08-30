@@ -1,101 +1,66 @@
 ---
-title: Data Migration 简介
-category: reference
+title: TiDB 简介
+category: introduction
 ---
 
-# Data Migration 简介
+# TiDB 简介
 
-[DM](https://github.com/pingcap/dm) (Data Migration) 是一体化的数据同步任务管理平台，支持从 MySQL 或 MariaDB 到 TiDB 的全量数据迁移和增量数据同步。使用 DM 工具有利于简化错误处理流程，降低运维成本。
+TiDB 是 PingCAP 公司设计的开源分布式 HTAP (Hybrid Transactional and Analytical Processing) 数据库，结合了传统的 RDBMS 和 NoSQL 的最佳特性。TiDB 兼容 MySQL，支持无限的水平扩展，具备强一致性和高可用性。TiDB 的目标是为 OLTP (Online Transactional Processing) 和 OLAP (Online Analytical Processing) 场景提供一站式的解决方案。
 
-## DM 架构
+TiDB 具备如下特性：
 
-DM 主要包括三个组件：DM-master，DM-worker 和 dmctl。
-
-![Data Migration architecture](/media/dm-architecture.png)
-
-### DM-master
-
-DM-master 负责管理和调度数据同步任务的各项操作。
-
-- 保存 DM 集群的拓扑信息
-- 监控 DM-worker 进程的运行状态
-- 监控数据同步任务的运行状态
-- 提供数据同步任务管理的统一入口
-- 协调分库分表场景下各个实例分表的 DDL 同步
-
-### DM-worker
-
-DM-worker 负责执行具体的数据同步任务。
-
-- 将 binlog 数据持久化保存在本地
-- 保存数据同步子任务的配置信息
-- 编排数据同步子任务的运行
-- 监控数据同步子任务的运行状态
-
-DM-worker 启动后，会自动同步上游 binlog 至本地配置目录（如果使用 DM-Ansible 部署 DM 集群，默认的同步目录为 `<deploy_dir>/relay_log`）。关于 DM-worker，详见 [DM-worker 简介](/reference/tools/data-migration/dm-worker-intro.md)。关于 relay log，详见 [DM Relay Log](/reference/tools/data-migration/relay-log.md)。
-
-### dmctl
-
-dmctl 是用来控制 DM 集群的命令行工具。
-
-- 创建、更新或删除数据同步任务
-- 查看数据同步任务状态
-- 处理数据同步任务错误
-- 校验数据同步任务配置的正确性
-
-## 同步功能介绍
-
-下面简单介绍 DM 数据同步功能的核心特性。
-
-### Table routing
-
-[Table routing](/reference/tools/data-migration/features/overview.md#table-routing) 是指将上游 MySQL 或 MariaDB 实例的某些表同步到下游指定表的路由功能，可以用于分库分表的合并同步。
-
-### Black & white table lists
-
-[Black & white table lists](/reference/tools/data-migration/features/overview.md#black-white-table-lists) 是指上游数据库实例表的黑白名单过滤规则。其过滤规则类似于 MySQL `replication-rules-db`/`replication-rules-table`，可以用来过滤或只同步某些数据库或某些表的所有操作。
-
-### Binlog event filter
-
-[Binlog event filter](/reference/tools/data-migration/features/overview.md#binlog-event-filter) 是比库表同步黑白名单更加细粒度的过滤规则，可以指定只同步或者过滤掉某些 `schema`/`table` 的指定类型的 binlog events，比如 `INSERT`，`TRUNCATE TABLE`。
-
-### Column mapping
-
-[Column mapping](/reference/tools/data-migration/features/overview.md#column-mapping) 是指根据用户指定的内置表达式对表的列进行转换，可以用来解决分库分表合并时自增主键 ID 的冲突。
-
-### Shard support
-
-DM 支持对原分库分表进行合库合表操作，但需要满足一些[使用限制](/reference/tools/data-migration/features/shard-merge.md#使用限制)。
-
-## 使用限制
-
-在使用 DM 工具之前，需了解以下限制：
-
-+ 数据库版本
+- 高度兼容 MySQL
     
-    - 5.5 < MySQL 版本 < 5.8
-    - MariaDB 版本 >= 10.1.2
-    
-    > **注意：**
-    > 
-    > 如果上游 MySQL/MariaDB server 间构成主从复制结构，则
-    > 
-    > - 5.7.1 < MySQL 版本 < 5.8
-    > - MariaDB 版本 >= 10.1.3
-    
-    在使用 dmctl 启动任务时，DM 会自动对任务上下游数据库的配置、权限等进行[前置检查](/reference/tools/data-migration/precheck.md)。
+    [大多数情况下](/reference/mysql-compatibility.md)，无需修改代码即可从 MySQL 轻松迁移至 TiDB，分库分表后的 MySQL 集群亦可通过 TiDB 工具进行实时迁移。
 
-- DDL 语法
+- 水平弹性扩展
     
-    - 目前，TiDB 部分兼容 MySQL 支持的 DDL 语句。因为 DM 使用 TiDB parser 来解析处理 DDL 语句，所以目前仅支持 TiDB parser 支持的 DDL 语法。详见 [TiDB DDL 语法支持](/reference/mysql-compatibility.md#ddl)。
-    
-    - DM 遇到不兼容的 DDL 语句时会报错。要解决此报错，需要使用 dmctl 手动处理，要么跳过该 DDL 语句，要么用指定的 DDL 语句来替换它。
+    通过简单地增加新节点即可实现 TiDB 的水平扩展，按需扩展吞吐或存储，轻松应对高并发、海量数据场景。
 
-- 分库分表
+- 分布式事务
     
-    - 如果业务分库分表之间存在数据冲突，冲突的列**只有自增主键列**，并且**列的类型是 bigint**，可以尝试使用 [Column mapping](/reference/tools/data-migration/features/overview.md#column-mapping) 来解决；否则不推荐使用 DM 进行同步，如果进行同步则有冲突的数据会相互覆盖造成数据丢失。
-    - 关于分库分表合并场景的其它限制，参见[使用限制](/reference/tools/data-migration/features/shard-merge.md#使用限制)。
-- 操作限制
+    TiDB 100% 支持标准的 ACID 事务。
+
+- 真正金融级高可用
     
-    - DM-worker 重启后不能自动恢复数据同步任务，需要使用 dmctl 手动执行 `start-task`。详见[管理数据同步任务](/reference/tools/data-migration/manage-tasks.md)。
-    - 在一些情况下，DM-worker 重启后不能自动恢复 DDL lock 同步，需要手动处理。详见[手动处理 Sharding DDL Lock](/reference/tools/data-migration/features/manually-handling-sharding-ddl-locks.md)。
+    相比于传统主从 (M-S) 复制方案，基于 Raft 的多数派选举协议可以提供金融级的 100% 数据强一致性保证，且在不丢失大多数副本的前提下，可以实现故障的自动恢复 (auto-failover)，无需人工介入。
+
+- 一站式 HTAP 解决方案
+    
+    TiDB 作为典型的 OLTP 行存数据库，同时兼具强大的 OLAP 性能，配合 TiSpark，可提供一站式 HTAP 解决方案，一份存储同时处理 OLTP & OLAP，无需传统繁琐的 ETL 过程。
+
+- 云原生 SQL 数据库
+    
+    TiDB 是为云而设计的数据库，支持公有云、私有云和混合云，配合 [TiDB Operator 项目](/tidb-in-kubernetes/tidb-operator-overview.md) 可实现自动化运维，使部署、配置和维护变得十分简单。
+
+TiDB 的设计目标是 100% 的 OLTP 场景和 80% 的 OLAP 场景，更复杂的 OLAP 分析可以通过 [TiSpark 项目](/reference/tispark.md)来完成。
+
+TiDB 对业务没有任何侵入性，能优雅的替换传统的数据库中间件、数据库分库分表等 Sharding 方案。同时它也让开发运维人员不用关注数据库 Scale 的细节问题，专注于业务开发，极大的提升研发的生产力。
+
+三篇文章了解 TiDB 技术内幕：
+
+- [说存储](https://pingcap.com/blog-cn/tidb-internal-1/)
+- [说计算](https://pingcap.com/blog-cn/tidb-internal-2/)
+- [谈调度](https://pingcap.com/blog-cn/tidb-internal-3/)
+
+## 部署方式
+
+TiDB 可以部署在本地和云平台上，支持公有云、私有云和混合云。你可以根据实际场景或需求，选择相应的方式来部署 TiDB 集群：
+
+- [使用 Ansible 部署](/how-to/deploy/orchestrated/ansible.md)：如果用于生产环境，推荐使用 Ansible 部署 TiDB 集群。
+- [使用 Ansible 离线部署](/how-to/deploy/orchestrated/offline-ansible.md)：如果部署环境无法访问网络，可使用 Ansible 进行离线部署。
+- [使用 TiDB Operator 部署](/tidb-in-kubernetes/deploy/tidb-operator.md)：使用 TiDB Operator 在 Kubernetes 集群上部署生产就绪的 TiDB 集群，支持[部署到 AWS EKS](/tidb-in-kubernetes/deploy/aws-eks.md)、[部署到谷歌云 GKE (beta)](/tidb-in-kubernetes/deploy/gcp-gke.md)、[部署到阿里云 ACK](/tidb-in-kubernetes/deploy/alibaba-cloud.md) 等。
+- [使用 Docker Compose 部署](/how-to/get-started/deploy-tidb-from-docker-compose.md)：如果你只是想测试 TiDB、体验 TiDB 的特性，或者用于开发环境，可以使用 Docker Compose 在本地快速部署 TiDB 集群。该部署方式不适用于生产环境。
+- [使用 Docker 部署](/how-to/deploy/orchestrated/docker.md)：你可以使用 Docker 部署 TiDB 集群，但该部署方式不适用于生产环境。
+- [使用 TiDB Operator 部署到 Minikube](/tidb-in-kubernetes/get-started/deploy-tidb-from-kubernetes-minikube.md)：你可以使用 TiDB Opeartor 将 TiDB 集群部署到本地 Minikube 启动的 Kubernetes 集群中。该部署方式不适用于生产环境。
+- [使用 TiDB Operator 部署到 DinD](/tidb-in-kubernetes/get-started/deploy-tidb-from-kubernetes-dind.md)：你可以使用 TiDB Operator 将 TiDB 集群部署到本地以 DinD 方式启动的 Kubernetes 集群中。该部署方式不适用于生产环境。
+
+## 项目源码
+
+TiDB 集群所有组件的源码均可从 GitHub 上直接访问：
+
+- [TiDB](https://github.com/pingcap/tidb)
+- [TiKV](https://github.com/tikv/tikv)
+- [PD](https://github.com/pingcap/pd)
+- [TiSpark](https://github.com/pingcap/tispark)
+- [TiDB Operator](https://github.com/pingcap/tidb-operator)
