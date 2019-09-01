@@ -1,44 +1,104 @@
 ---
-title: TiDB Binlog Cluster 版本升级方法
+title: TiDB Binlog 集群监控
 category: reference
 ---
 
-# TiDB Binlog Cluster 版本升级方法
+# TiDB Binlog 集群监控
 
-新版本的 TiDB（v2.0.8-binlog、v2.1.0-rc.5 及以上版本）不兼容 [Kafka 版本](/reference/tools/tidb-binlog/tidb-binlog-kafka.md)以及 [Local 版本](/reference/tools/tidb-binlog/tidb-binlog-local.md)的 TiDB Binlog，集群升级到新版本后只能使用 Cluster 版本的 TiDB Binlog。如果在升级前已经使用了 Kafka／Local 版本的 TiDB Binlog，必须将其升级到 Cluster 版本。
+使用 Ansible 成功部署 TiDB Binlog 集群后，可以进入 Grafana Web 界面（默认地址: <http://grafana_ip:3000>，默认账号：admin，密码：admin）查看 Pump 和 Drainer 的运行状态。
 
-TiDB Binlog 版本与 TiDB 版本的对应关系如下：
+## 监控指标
 
-| TiDB Binlog 版本 | TiDB 版本                               | 说明                                                          |
-| -------------- | ------------------------------------- | ----------------------------------------------------------- |
-| Local          | TiDB 1.0 及更低版本                        |                                                             |
-| Kafka          | TiDB 1.0 ~ TiDB 2.1 RC5               | TiDB 1.0 支持 local 版本和 Kafka 版本的 TiDB Binlog。                |
-| Cluster        | TiDB v2.0.8-binlog，TiDB 2.1 RC5 及更高版本 | TiDB v2.0.8-binlog 是一个支持 Cluster 版本 TiDB Binlog 的 2.0 特殊版本。 |
+### Pump
+
+| metric 名称                    | 说明                                                                                      |
+|:---------------------------- |:--------------------------------------------------------------------------------------- |
+| Storage Size                 | 记录磁盘的总空间大小 (capacity)，以及可用磁盘空间大小 (available)                                            |
+| Metadata                     | 记录每个 Pump 的可删除 binlog 的最大 tso (gc_tso)，以及保存的 binlog 的最大的 commit tso (max_commit_tso)。 |
+| Write Binlog QPS by Instance | 每个 Pump 接收到的写 binlog 请求的 QPS                                                            |
+| Write Binlog Latency         | 记录每个 Pump 写 binlog 的延迟时间                                                                |
+| Storage Write Binlog Size    | Pump 写 binlog 数据的大小                                                                     |
+| Storage Write Binlog Latency | Pump 中的 storage 模块写 binlog 数据的延迟                                                        |
+| Pump Storage Error By Type   | Pump 遇到的 error 数量，按照 error 的类型进行统计                                                      |
+| Query TiKV                   | Pump 通过 TiKV 查询事务状态的次数                                                                  |
 
 
-## 升级流程
+### Drainer
 
-> **注意：**
-> 
-> 如果能接受重新导全量数据，则可以直接废弃老版本，按 [TiDB Binlog 集群部署](/how-to/deploy/tidb-binlog.md)中的步骤重新部署。
+| metric 名称                         | 说明                                                                                                                  |
+|:--------------------------------- |:------------------------------------------------------------------------------------------------------------------- |
+| Checkpoint TSO                    | Drainer 已经同步到下游的 binlog 的最大 TSO 对应的时间。可以通过该指标估算同步延迟时间                                                               |
+| Pump Handle TSO                   | 记录 Drainer 从各个 Pump 获取到的 binlog 的最大 TSO 对应的时间 | | Pull Binlog QPS by Pump NodeID | Drainer 从每个 Pump 获取 binlog 的 QPS |
+| 95% Binlog Reach Duration By Pump | 记录 binlog 从写入 Pump 到被 Drainer 获取到这个过程的延迟时间                                                                          |
+| Error By Type                     | Drainer 遇到的 error 数量，按照 error 的类型进行统计                                                                               |
+| Drainer Event                     | 各种类型 event 的数量，event 包括 ddl、insert、delete、update、flush、savepoint                                                    |
+| Execute Time                      | 在下游执行 SQL 语句或写数据所消耗的时间                                                                                              |
+| 95% Binlog Size                   | Drainer 从各个 Pump 获取到 binlog 数据的大小                                                                                   |
+| DL Job Count                      | Drainer 处理的 DDL 的数量                                                                                                 |
 
-如果想从原来的 checkpoint 继续同步，使用以下升级流程：
 
-1. 部署新版本 Pump。
-2. 暂停 TiDB 集群业务。
-3. 更新 TiDB 以及配置，写 Binlog 到新的 Pump Cluster。
-4. TiDB 集群重新接入业务。
-5. 确认老版本的 Drainer 已经将老版本的 Pump 的数据完全同步到下游。
+## 监控告警规则
+
+### Emergency
+
+#### binlog_pump_storage_error_count
+
+- 含义：Pump 写 binlog 到本地存储时失败
+- 监控规则：changes(binlog_pump_storage_error_count[1m]) > 0
+- 处理方法：先确认 pump_storage_error 监控是否存在错误，查看 Pump 日志确认原因
+
+### Critical
+
+#### binlog_drainer_checkpoint_high_delay
+
+- 含义：Drainer 同步落后延迟超过 1 个小时
+- 监控规则：(time() - binlog_drainer_checkpoint_tso / 1000) > 3600
+- 处理方法：
     
-    查询 Drainer 的 `status` 接口，示例命令如下：
-
-    ```bash
-    $ curl 'http://172.16.10.49:8249/status'
-    {"PumpPos":{"172.16.10.49:8250":{"offset":32686}},"Synced": true ,"DepositWindow":{"Upper":398907800202772481,"Lower":398907799455662081}}
-    ```
-
-     如果返回的 `Synced` 为 true，则可以认为 Binlog 数据已经全部同步到了下游。
+    - 判断从 Pump 获取数据是否太慢：
+        
+        监控 Pump handle tso 可以看每个 Pump 最近一条消息的时间，是不是有延迟特别大的 Pump，确认对应 Pump 正常运行
     
+    - 根据 Drainer event 和 Drainer execute latency 来判断是否下游同步太慢：
+        
+        - 如果 Drainer execute time 过大，则检查到目标库网络带宽和延迟，以及目标库状态
+        - 如果 Drainer execute time 不大，Drainer event 过小，则增加 work count 和 batch 进行重试
+    - 上面都不满足或者操作后没有改观，则报备开发 support@pingcap.com 进行处理
 
-6. 启动新版本 Drainer；
-7. 下线老版本的 Pump、Drainer 以及依赖的 Kafka 和 ZookeSeper。
+### Warning
+
+#### binlog_pump_write_binlog_rpc_duration_seconds_bucket
+
+- 含义：Pump 处理 TiDB 写 Binlog 请求耗时过大
+- 监控规则：histogram_quantile(0.9, rate(binlog_pump_rpc_duration_seconds_bucket{method="WriteBinlog"}[5m])) > 1
+- 处理方法：
+    
+    - 确认磁盘性能压力，通过 node exported 查看 disk performance 监控
+    - 如果 disk latency 和 util 都很低，那么报备研发 support@pingcap.com 处理
+
+#### binlog_pump_storage_write_binlog_duration_time_bucket
+
+- 含义：Pump 写本地 binlog 到本地盘的耗时
+- 监控规则：histogram_quantile(0.9, rate(binlog_pump_storage_write_binlog_duration_time_bucket{type="batch"}[5m])) > 1
+- 处理方法：确认 Pump 本地盘情况，进行修复
+
+#### binlog_pump_storage_available_size_less_than_20G
+
+- 含义：Pump 剩余可用磁盘空间不足 20G
+- 监控规则：binlog_pump_storage_storage_size_bytes{type="available"} < 20 * 1024 * 1024 * 1024
+- 处理方法：监控确认 Pump gc_tso 正常，需要的话调整 Pump gc 时间配置或者下线对应 Pump
+
+#### binlog_drainer_checkpoint_tso_no_change_for_1m
+
+- 含义：Drainer checkpoint 一分钟没有更新
+- 监控规则：changes(binlog_drainer_checkpoint_tso[1m]) < 1
+- 处理方法：确认是否所有非下线 Pump 正常运行
+
+#### binlog_drainer_execute_duration_time_more_than_10s
+
+- 含义：Drainer 同步到 TiDB 的 transaction 耗时，如果过大则影响 Drainer 同步
+- 监控规则：histogram_quantile(0.9, rate(binlog_drainer_execute_duration_time_bucket[1m])) > 10
+- 处理方法：
+    
+    - 查看 TiDB cluster 状态情况
+    - 查看 Drainer 日志或监控，如果是 DDL 则忽略
