@@ -208,7 +208,7 @@ SET ROLE NONE
 SET ROLE ALL EXCEPT 'role1', 'role2'
 ```
 
-> **注意：**
+> **Note:**
 > 
 > 使用 `SET ROLE` 启用的角色只有在当前 session 才会有效。
 
