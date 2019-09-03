@@ -413,7 +413,7 @@ ALTER TABLE members TRUNCATE PARTITION p1;
     Query OK, 0 rows affected (0.03 sec)
     
 
-> **注意：**
+> **Note:**
 > 
 > `ALTER TABLE ... REORGANIZE PARTITION` 在 TiDB 中暂不支持。
 
