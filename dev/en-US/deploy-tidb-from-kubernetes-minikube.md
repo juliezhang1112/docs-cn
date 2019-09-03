@@ -45,7 +45,7 @@ minikube start --docker-env https_proxy=http://127.0.0.1:1086 \
   --docker-env http_proxy=http://127.0.0.1:1086
 ```
 
-> **注意：**
+> **Note:**
 > 
 > 由于 Minikube 通过虚拟机（默认）运行，`127.0.0.1` 是虚拟机本身，有些情况下你可能想要使用你的主机的实际 IP。
 
@@ -140,7 +140,7 @@ helm search tidb-operator -l
 
 ### 在 Kubernetes 集群上安装 TiDB Operator
 
-> **注意：**
+> **Note:**
 > 
 > `<chartVersion>` 在后面文档中代表 chart 版本，例如 `v1.0.0`。
 
