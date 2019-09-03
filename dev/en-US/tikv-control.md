@@ -37,7 +37,7 @@ $ tikv-ctl --to-hex "\252\377"
 AAFF
 ```
 
-> **注意：**
+> **Note:**
 > 
 > 在命令行上指定 `escaped` 形式的 key 时，需要用双引号引起来，否则 bash 会将反斜杠吃掉，导致结果错误。
 
@@ -98,7 +98,7 @@ key: zmDB:29\000\000\377\000\374\000\000\000\000\000\000\377\000H\000\000\000\00
          write cf value: start_ts: 399650105199951882 commit_ts: 399650105213059076 short_value: "\000\000\000\000\000\000\000\001"
 ```
 
-> **注意：**
+> **Note:**
 > 
 > 该命令中，key 同样需要是 escaped 形式的 raw key。
 
@@ -149,7 +149,7 @@ $ tikv-ctl --db /path/to/tikv/db tombstone -p 127.0.0.1:2379 -r 2
 success!
 ```
 
-> **注意：**
+> **Note:**
 > 
 > - **该命令只支持本地模式**
 > - `-p` 选项的参数指定 PD 的 endpoints，无需 `http` 前缀。指定 PD 的 endpoints 是为了询问 PD 是否可以安全切换至 Tombstone 状态。因此，在将 PD 置为 Tombstone 之前往往还需要在 `pd-ctl` 中把该 Region 在机器上的对应 Peer 拿掉。
@@ -165,7 +165,7 @@ $ tikv-ctl --host 127.0.0.1:21061 consistency-check -r 2
 DebugClient::check_region_consistency: RpcFailure(RpcStatus { status: Unknown, details: Some("StringError(\"Leader is on store 1\")") })
 ```
 
-> **注意：**
+> **Note:**
 > 
 > - **该命令只支持远程模式**。
 > - 即使该命令返回了成功信息，也需要检查是否有 TiKV panic 了。因为该命令只是向 Leader 请求进行一致性检查，但整个检查流程是否成功并不能在客户端知道。
@@ -235,7 +235,7 @@ $ tikv-ctl --db /path/to/tikv/db unsafe-recover remove-fail-stores -s 4,5 --all-
 
 之后启动 TiKV，这些 Region 便可以使用剩下的健康副本继续提供服务了。此命令常用于多个 TiKV store 损坏或被删除的情况。
 
-> **注意：**
+> **Note:**
 > 
 > - 该命令只支持本地模式。在运行成功后，会打印 `success!`。
 > - 一般来说，您需要为指定 Region 的 peers 所在的每个 store 运行此命令。
@@ -252,7 +252,7 @@ $ tikv-ctl --db /path/to/tikv/db recover-mvcc -r 1001,1002 -p 127.0.0.1:2379
 success!
 ```
 
-> **注意：**
+> **Note:**
 > 
 > - 该命令只支持本地模式。在运行成功后，会打印 `success!`。
 > - `-p` 选项指定 PD 的 endpoint，不使用 `http` 前缀，用于查询指定的 `region_id` 是否有效。
