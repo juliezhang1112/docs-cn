@@ -36,7 +36,7 @@ Drainer 从 Kafka 中收集 Binlog，并按照 TiDB 中事务的提交顺序转�
 
 Kafka 集群用来存储由 Pump 写入的 Binlog 数据，并提供给 Drainer 进行读取。
 
-> **注意：**
+> **Note:**
 > 
 > Local 版本将 Binlog 存储在文件中，Kafka 版本则使用 Kafka 存储。
 
@@ -413,7 +413,7 @@ PbReader 使用示例
     
     点击 Grafana Logo -> 点击 Data Sources -> 点击 Add data source -> 填写 data source 信息
     
-    > **注意：**
+    > **Note:**
     > 
     > Type 选 Prometheus，URL 为 Prometheus 地址，根据实际情况添加/填写。
 
