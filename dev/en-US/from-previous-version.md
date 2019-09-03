@@ -15,13 +15,13 @@ category: how-to
     - 停机升级，直接从早于 2.0.1 的 TiDB 版本升级到 3.0
     - 先滚动升级到 2.0.1 或者之后的 2.0.x 版本，再滚动升级到 3.0 版本
 
-> **注意：**
+> **Note:**
 > 
 > 在升级的过程中不要执行 DDL 请求，否则可能会出现行为未定义的问题。
 
 ## 在中控机器上安装 Ansible 及其依赖
 
-> **注意：**
+> **Note:**
 > 
 > 如果已经安装了 Ansible 及其依赖，可跳过该步骤。
 
@@ -39,7 +39,7 @@ TiDB-Ansible release-3.0 版本依赖 Ansible 2.4.2 及以上版本（`ansible>=
     Version: 0.9.0
     
 
-> **注意：**
+> **Note:**
 > 
 > 请务必按以上文档安装 Ansible 及其依赖。确认 Jinja2 版本是否正确，否则启动 Grafana 时会报错。确认 jmespath 版本是否正确，否则滚动升级 TiKV 时会报错。
 
@@ -103,7 +103,7 @@ TiDB-Ansible release-3.0 版本依赖 Ansible 2.4.2 及以上版本（`ansible>=
             # low-concurrency: 8
         
     
-    > **注意：**
+    > **Note:**
     > 
     > 单机多 TiKV 实例（进程）情况下，需要修改这三个参数。
     > 
@@ -115,7 +115,7 @@ TiDB-Ansible release-3.0 版本依赖 Ansible 2.4.2 及以上版本（`ansible>=
             block-cache:
               capacity: "1GB"
     
-    > **注意：**
+    > **Note:**
     > 
     > 单机多 TiKV 实例（进程）情况下，需要修改 `capacity` 参数。
     > 
@@ -140,7 +140,7 @@ TiDB-Ansible release-3.0 版本依赖 Ansible 2.4.2 及以上版本（`ansible>=
     $ ansible-playbook rolling_update.yml
     
 
-> **注意：**
+> **Note:**
 > 
 > 为优化 TiDB 集群组件的运维管理，TiDB 3.0 版本对 `systemd` 模式下的 `PD service` 名称进行了调整。在升级到 TiDB 3.0 版本后，滚动升级及日常滚动重启 TiDB 集群统一使用 `rolling_update.yml` 操作，不再使用 `excessive_rolling_update.yml`。
 
