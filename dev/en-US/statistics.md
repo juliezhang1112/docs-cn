@@ -15,7 +15,7 @@ TiDB 优化器会根据统计信息来选择最优的执行计划。统计信息
 
 #### 全量收集
 
-> **注意：**
+> **Note:**
 > 
 > 在 TiDB 中执行 `ANALYZE TABLE` 语句比在 MySQL 或 InnoDB 中耗时更长。InnoDB 采样的只是少量页面，但 TiDB 会完全重构一系列统计信息。适用于 MySQL 的脚本会误以为执行 `ANALYZE TABLE` 耗时较短。
 > 
@@ -65,7 +65,7 @@ ANALYZE TABLE TableName PARTITION PartitionNameList [IndexNameList] [WITH NUM BU
 
 对于类似时间列这样的单调不减列，在进行全量收集后，可以使用增量收集来单独分析新增的部分，以提高分析的速度。
 
-> **注意：**
+> **Note:**
 > 
 > 1. 目前只有索引提供了增量收集的功能
 > 2. 使用增量收集时，必须保证表上只有插入操作，且应用方需要保证索引列上新插入的值是单调不减的，否则会导致统计信息不准，影响 TiDB 优化器选择合适的执行计划
