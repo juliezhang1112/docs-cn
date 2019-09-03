@@ -7,7 +7,7 @@ category: how-to
 
 本文介绍如何对 Kubernetes 上的集群进行初始化配置完成初始化账号和密码设置，以及批量自动执行 SQL 语句对数据库进行初始化。
 
-> **注意：**
+> **Note:**
 > 
 > 以下功能只在第一次创建集群时有作用，集群创建之后再设置或修改不会生效。
 
@@ -72,6 +72,6 @@ tidb:
 helm install pingcap/tidb-cluster -f values.yaml --name=<release-name> --namespace=<namespace> --version=<chart-version>
 ```
 
-> **注意：**
+> **Note:**
 > 
 > 目前没有对 initSql 做校验，尽管也可以在 initSql 里面创建账户和设置密码，但这种方式会将密码以明文形式存到 initializer Job 对象上，不建议这么做。
