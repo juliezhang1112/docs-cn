@@ -66,7 +66,7 @@ Ad-hoc 全量备份封装在 `pingcap/tidb-backup` 这个 Helm chart 中。根�
     * 将 `storage.className` 设置为用于存储数据的 PV 的 `storageClass`；
     * 根据数据量调整 `storage.size`；
     
-    > **注意：**
+    > **Note:**
     > 
     > 你必须将 Ad-hoc 全量备份使用的 PV 的 [reclaim policy](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy) 设置为 `Retain` 来确保你的数据安全。
 
