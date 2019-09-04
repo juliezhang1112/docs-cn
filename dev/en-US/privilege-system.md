@@ -1,9 +1,9 @@
 ---
-title: 权限管理
+title: Privilege Management
 category: reference
 ---
 
-# 权限管理
+# Privilege Management
 
 TiDB 的权限管理系统按照 MySQL 的权限管理进行实现，TiDB 支持大部分的 MySQL 的语法和权限类型。
 
