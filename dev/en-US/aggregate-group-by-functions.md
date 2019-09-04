@@ -22,7 +22,7 @@ TiDB 支持的 MySQL GROUP BY 聚合函数如下所示：
 | [`GROUP_CONCAT()`](https://dev.mysql.com/doc/refman/5.7/en/group-by-functions.html#function_group-concat)    | 返回连接的字符串   |
 
 
-> **注意：**
+> **Note:**
 > 
 > - 除非另有说明，否则聚合函数默认忽略 `NULL` 值。
 > - 如果在不包含 `GROUP BY` 子句的语句中使用聚合函数，则相当于对所有行进行分组。
