@@ -21,13 +21,13 @@ category: how-to
 
 DM 在增量同步阶段依赖 `ROW` 格式的 binlog，如果未启用 binlog 及设置正确的 binlog 格式，则不能正常使用 DM 进行数据同步，具体可参见\[检查内容\](/reference/tools/data-migration/precheck.md#检查内容)。
 
-> **注意：**
+> **Note:**
 > 
 > Aurora 读取器不能开启 binlog，因此不能作为 DM 数据迁移时的上游 master server。
 
 如果需要基于 GTID 进行数据迁移，还需要为 Aurora 集群启用 GTID 支持。
 
-> **注意：**
+> **Note:**
 > 
 > 基于 GTID 的数据迁移需要 MySQL 5.7 (Aurora 2.04.1) 或更高版本。
 
@@ -37,7 +37,7 @@ DM 在增量同步阶段依赖 `ROW` 格式的 binlog，如果未启用 binlog �
 
 如果需要基于 GTID 进行数据迁移，需要将 `gtid-mode` 与 `enforce_gtid_consistency` 均设置为 `ON`。有关如何为 Aurora 集群启用基于 GTID 的数据迁移支持，请参考 [Configuring GTID-Based Replication for an Aurora MySQL Cluster](https://docs.aws.amazon.com/zh_cn/AmazonRDS/latest/AuroraUserGuide/mysql-replication-gtid.html#mysql-replication-gtid.configuring-aurora)。
 
-> **注意：**
+> **Note:**
 > 
 > 在 Aurora 管理后台中，`gtid_mode` 参数表示为 `gtid-mode`。
 
@@ -45,7 +45,7 @@ DM 在增量同步阶段依赖 `ROW` 格式的 binlog，如果未启用 binlog �
 
 目前推荐使用 DM-Ansible 部署 DM 集群，具体部署方法参照[使用 DM-Ansible 部署 DM 集群](/how-to/deploy/data-migration-with-ansible.md)。
 
-> **注意：**
+> **Note:**
 > 
 > - 在 DM 所有的配置文件中，数据库的密码要使用 dmctl 加密后的密文。如果数据库密码为空，则不需要加密。关于如何使用 dmctl 加密明文密码，参考[使用 dmctl 加密上游 MySQL 用户密码](/how-to/deploy/data-migration-with-ansible.md#使用-dmctl-加密上游-mysql-用户密码)。
 > - 上下游数据库用户必须拥有相应的读写权限。
@@ -187,7 +187,7 @@ mydumpers:
 query-status
 ```
 
-> **注意：**
+> **Note:**
 > 
 > 如果查询命令的返回结果中包含以下错误信息，则表明在全量同步的 dump 阶段不能获得相应的 lock：
 > 
