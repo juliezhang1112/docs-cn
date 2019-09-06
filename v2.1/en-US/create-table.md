@@ -216,7 +216,7 @@ table_option:
 | `COMMENT`           | 注释信息                                            | `COMMENT` = 'comment info'  |
 
 
-> **注意：**
+> **Note:**
 > 
 > 在 TiDB 2.1 版本中，`SHARD_ROW_ID_BITS`、`PRE_SPLIT_REGIONS` 和 `COLLATE` 这三个功能都是从 2.1.13 版本（包括 2.1.13）开始支持的。
 
