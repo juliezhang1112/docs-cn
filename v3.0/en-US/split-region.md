@@ -175,7 +175,7 @@ SPLIT TABLE t1 INDEX idx4 BY ("a", "2000-01-01 00:00:01"), ("b", "2019-04-17 14:
 
 使用带有 `shard_row_id_bits` 的表时，如果希望建表时就做均匀切分 Region，可以考虑配合 `pre_split_regions` 一起使用，用来在建表成功后就开始预均匀切分 `2^(pre_split_regions-1)` 个 Region。
 
-> **注意：**
+> **Note:**
 > 
 > `pre_split_regions` 必须小于等于 `shard_row_id_bits`。
 
