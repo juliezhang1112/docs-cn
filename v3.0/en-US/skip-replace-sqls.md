@@ -53,7 +53,7 @@ aliases:
 
 对于合库合表场景，如果需要由 DM 自动选择 DDL lock owner 来执行跳过/替代执行操作，则由于不同 DM-worker 上 DDL 语句对应的 binlog position 无逻辑关联且难以确定，因此只能使用 DDL pattern 匹配模式。
 
-> **注意：**
+> **Note:**
 > 
 > - 一个 binlog event 只能注册一个使用 `--binlog-pos` 指定的 operator，后注册的 operator 会覆盖之前已经注册的 operator。
 > - 不要尝试为一个 binlog event 同时使用 `--binlog-pos` 和 `--sql-pattern` 指定 operator。
