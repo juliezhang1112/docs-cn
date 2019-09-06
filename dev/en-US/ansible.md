@@ -22,7 +22,7 @@ Ansible 是一款自动化运维工具，[TiDB-Ansible](https://github.com/pingc
 - \[清除集群数据\](/how-to/maintain/ansible-operations.md#清除集群数据)
 - [销毁集群](/how-to/maintain/ansible-operations.md#销毁集群)
 
-> **注意：**
+> **Note:**
 > 
 > 对于生产环境，须使用 TiDB-Ansible 部署 TiDB 集群。如果只是用于测试 TiDB 或体验 TiDB 的特性，建议[使用 Docker Compose 在单机上快速部署 TiDB 集群](/how-to/get-started/deploy-tidb-from-docker-compose.md)。
 
@@ -35,7 +35,7 @@ Ansible 是一款自动化运维工具，[TiDB-Ansible](https://github.com/pingc
 -     机器之间内网互通。
         
     
-    > **注意：**
+    > **Note:**
     > 
     > 使用 Ansible 方式部署时，TiKV 及 PD 节点数据目录所在磁盘请使用 SSD 磁盘，否则无法通过检测。** 如果仅验证功能，建议使用 [Docker Compose 部署方案](/how-to/get-started/deploy-tidb-from-docker-compose.md)单机进行测试。
 
@@ -118,7 +118,7 @@ Ansible 是一款自动化运维工具，[TiDB-Ansible](https://github.com/pingc
     $ git clone https://github.com/pingcap/tidb-ansible.git
     
 
-> **注意：**
+> **Note:**
 > 
 > - 部署和升级 TiDB 集群需使用对应的 tidb-ansible 版本，通过改 `inventory.ini` 文件中的版本来混用可能会产生一些错误。
 > - 请务必按文档操作，将 `tidb-ansible` 下载到 `/home/tidb` 目录下，权限为 `tidb` 用户，不要下载到 `/root` 下，否则会遇到权限问题。
@@ -394,7 +394,7 @@ location_labels = ["host"]
                   block-cache:
                     capacity: "1GB"
         
-        > **注意：**
+        > **Note:**
         > 
         > TiKV 实例数量指每个服务器上 TiKV 的进程数量。
         > 
@@ -410,7 +410,7 @@ location_labels = ["host"]
                  # normal-concurrency: 8
                  # low-concurrency: 8
         
-        > **注意：**
+        > **Note:**
         > 
         > 推荐设置：TiKV 实例数量 \* 参数值 = CPU 核心数量 \* 0.8
     
@@ -419,7 +419,7 @@ location_labels = ["host"]
             raftstore:
                  capacity: 0
         
-        > **注意：**
+        > **Note:**
         > 
         > 推荐配置：`capacity` = 磁盘总容量 / TiKV 实例数量
         > 
@@ -443,7 +443,7 @@ location_labels = ["host"]
 
 #### 其他变量调整
 
-> **注意：**
+> **Note:**
 > 
 > 以下控制变量开启请使用首字母大写 `True`，关闭请使用首字母大写 `False`。
 
@@ -610,7 +610,7 @@ location_labels = ["host"]
        polling server every 1024 s
     
 
-> **注意：**
+> **Note:**
 > 
 > Ubuntu 系统需安装 ntpstat 软件包。
 
