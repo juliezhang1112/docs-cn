@@ -9,7 +9,7 @@ aliases:
 
 `mydumper` 是一个强大的数据迁移工具，具体可以参考 <https://github.com/maxbube/mydumper>。你可以使用 `mydumper` 从 MySQL 导出数据，然后用 `loader` 将其导入到 TiDB。
 
-> **注意：**
+> **Note:**
 > 
 > 虽然 TiDB 也支持使用 MySQL 官方的 `mysqldump` 工具来进行数据的迁移工作，但相比于 `mydumper`/`loader`，性能会慢很多，大量数据的迁移会花费很多时间，这里我们并不推荐。
 
@@ -46,17 +46,17 @@ aliases:
 
 `--skip-tz-utc` 添加这个参数忽略掉 MySQL 与导数据的机器之间时区设置不一致的情况，禁止自动转换。
 
-> **注意：**
+> **Note:**
 > 
 > 在阿里云等一些需要 `super privilege` 的云上面，`mydumper` 需要加上 `--no-locks` 参数，否则会提示没有权限操作。
 
 ## 向 TiDB 导入数据
 
-> **注意：**
+> **Note:**
 > 
 > 目前 TiDB 支持 UTF8mb4 [字符编码](/reference/sql/character-set.md)，假设 mydumper 导出数据为 latin1 字符编码，请使用 `iconv -f latin1 -t utf-8 $file -o /data/imdbload/$basename` 命令转换，$file 为已有文件，$basename 为转换后文件。
 > 
-> **注意：**
+> **Note:**
 > 
 > 如果 mydumper 使用 -m 参数，会导出不带表结构的数据，这时 loader 无法导入数据。
 
