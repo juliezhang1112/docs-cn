@@ -96,7 +96,7 @@ admin show ddl jobs;
 
 * `ADMIN CANCEL DDL JOBS job_id [, job_id] ...`：用于取消当前正在运行的 DDL 作业，并返回对应作业是否取消成功。如果取消失败，会显示失败的具体原因。
     
-    > **注意：**
+    > **Note:**
     > 
     > - 只有该操作可以取消 DDL 作业，其他所有的操作和环境变更（例如机器重启、集群重启）都不会取消 DDL 作业。
     > - 该操作可以同时取消多个 DDL 作业。可以通过 `ADMIN SHOW DDL JOBS` 语句来获取 DDL 作业的 ID。
