@@ -1,40 +1,101 @@
 ---
-title: GC 机制简介
+title: Data Migration 简介
 category: reference
 ---
 
-# GC 机制简介
+# Data Migration 简介
 
-TiDB 的事务的实现采用了 MVCC（多版本并发控制）机制，当新写入的数据覆盖旧的数据时，旧的数据不会被替换掉，而是与新写入的数据同时保留，并以时间戳来区分版本。GC 的任务便是清理不再需要的旧数据。
+[DM](https://github.com/pingcap/dm) (Data Migration) 是一体化的数据同步任务管理平台，支持从 MySQL 或 MariaDB 到 TiDB 的全量数据迁移和增量数据同步。使用 DM 工具有利于简化错误处理流程，降低运维成本。
 
-## 整体流程
+## DM 架构
 
-一个 TiDB 集群中会有一个 TiDB 实例被选举为 GC leader，GC 的运行由 GC leader 来控制。
+DM 主要包括三个组件：DM-master，DM-worker 和 dmctl。
 
-GC 会被定期触发，默认情况下每 10 分钟一次。每次 GC 时，首先，TiDB 会计算一个称为 safe point 的时间戳（默认为当前时间减去 10 分钟），接下来 TiDB 会在保证 safe point 之后的快照全部拥有正确数据的前提下，删除更早的过期数据。具体而言，分为以下三个步骤：
+![Data Migration architecture](/media/dm-architecture.png)
 
-1. Resolve Locks
-2. Delete Ranges
-3. Do GC
+### DM-master
 
-### Resolve Locks
+DM-master 负责管理和调度数据同步任务的各项操作。
 
-TiDB 的事务是基于 [Google Percolator](https://ai.google/research/pubs/pub36726) 模型实现的，事务的提交是一个两阶段提交的过程。第一阶段完成时，所有涉及的 key 会加上一个锁，其中一个锁会被设定为 Primary，其余的锁（Secondary）则会指向 Primary；第二阶段会将 Primary 锁所在的 key 加上一个 Write 记录，并去除锁。这里的 Write 记录就是历史上对该 key 进行写入或删除，或者该 key 上发生事务回滚的记录。Primary 锁被替换为何种 Write 记录标志着该事务提交成功与否。接下来，所有 Secondary 锁也会被依次替换。如果替换这些 Secondary 锁的线程死掉了，锁就残留了下来。
+- 保存 DM 集群的拓扑信息
+- 监控 DM-worker 进程的运行状态
+- 监控数据同步任务的运行状态
+- 提供数据同步任务管理的统一入口
+- 协调分库分表场景下各个实例分表的 DDL 同步
 
-Resolve Locks 这一步的任务即对 safe point 之前的锁进行回滚或提交，取决于其 Primary 是否被提交。如果一个 Primary 锁也残留了下来，那么该事务应当视为超时并进行回滚。这一步是必不可少的，因为如果其 Primary 的 Write 记录由于太老而被 GC 清除掉了，那么就再也无法知道该事务是否成功。如果该事务存在残留的 Secondary 锁，那么也无法知道它应当被回滚还是提交，也就无法保证一致性。
+### DM-worker
 
-Resolve Locks 的执行方式是由 GC leader 对所有的 Region 发送请求进行处理。从 3.0 起，这个过程默认会并行地执行，并发数量默认与 TiKV 节点个数相同。
+DM-worker 负责执行具体的数据同步任务。
 
-### Delete Ranges
+- 将 binlog 数据持久化保存在本地
+- 保存数据同步子任务的配置信息
+- 编排数据同步子任务的运行
+- 监控数据同步子任务的运行状态
 
-在执行 `DROP TABLE/INDEX` 等操作时，会有大量连续的数据被删除。如果对每个 key 都进行删除操作、再对每个 key 进行 GC 的话，那么执行效率和空间回收速度都可能非常的低下。事实上，这种时候 TiDB 并不会对每个 key 进行删除操作，而是将这些待删除的区间及删除操作的时间戳记录下来。Delete Ranges 会将这些时间戳在 safe point 之前的区间进行快速的物理删除。
+DM-worker 启动后，会自动同步上游 binlog 至本地配置目录（如果使用 DM-Ansible 部署 DM 集群，默认的同步目录为 `<deploy_dir>/relay_log`）。关于 DM-worker，详见 [DM-worker 简介](/reference/tools/data-migration/dm-worker-intro.md)。关于 relay log，详见 [DM Relay Log](/reference/tools/data-migration/relay-log.md)。
 
-### Do GC
+### dmctl
 
-这一步即删除所有 key 的过期版本。为了保证 safe point 之后的任何时间戳都具有一致的快照，这一步删除 safe point 之前提交的数据，但是会保留 safe point 前的最后一次写入（除非最后一次写入是删除）。
+dmctl 是用来控制 DM 集群的命令行工具。
 
-TiDB 2.1 及更早版本使用的 GC 方式是由 GC leader 向所有 Region 发送 GC 请求。从 3.0 起，GC leader 只需将 safe point 上传至 PD。每个 TiKV 节点都会各自从 PD 获取 safe point。当 TiKV 发现 safe point 发生更新时，便会对当前节点上所有作为 leader 的 Region 进行 GC。与此同时，GC leader 可以继续触发下一轮 GC。
+- 创建、更新或删除数据同步任务
+- 查看数据同步任务状态
+- 处理数据同步任务错误
+- 校验数据同步任务配置的正确性
 
-> **Note:**
-> 
-> 通过修改配置可以继续使用旧的 GC 方式，详情请参考 [GC 配置](/reference/garbage-collection/configuration.md)。
+## 同步功能介绍
+
+下面简单介绍 DM 数据同步功能的核心特性。
+
+### Table routing
+
+[Table routing](/reference/tools/data-migration/features/overview.md#table-routing) 是指将上游 MySQL 或 MariaDB 实例的某些表同步到下游指定表的路由功能，可以用于分库分表的合并同步。
+
+### Black & white table lists
+
+[Black & white table lists](/reference/tools/data-migration/features/overview.md#black-white-table-lists) 是指上游数据库实例表的黑白名单过滤规则。其过滤规则类似于 MySQL `replication-rules-db`/`replication-rules-table`，可以用来过滤或只同步某些数据库或某些表的所有操作。
+
+### Binlog event filter
+
+[Binlog event filter](/reference/tools/data-migration/features/overview.md#binlog-event-filter) 是比库表同步黑白名单更加细粒度的过滤规则，可以指定只同步或者过滤掉某些 `schema`/`table` 的指定类型的 binlog events，比如 `INSERT`，`TRUNCATE TABLE`。
+
+### Column mapping
+
+[Column mapping](/reference/tools/data-migration/features/overview.md#column-mapping) 是指根据用户指定的内置表达式对表的列进行转换，可以用来解决分库分表合并时自增主键 ID 的冲突。
+
+### Shard support
+
+DM 支持对原分库分表进行合库合表操作，但需要满足一些[使用限制](/reference/tools/data-migration/features/shard-merge.md#使用限制)。
+
+## 使用限制
+
+在使用 DM 工具之前，需了解以下限制：
+
++ 数据库版本
+    
+    - 5.5 < MySQL 版本 < 5.8
+    - MariaDB 版本 >= 10.1.2
+    
+    > **Note:**
+    > 
+    > 如果上游 MySQL/MariaDB server 间构成主从复制结构，则
+    > 
+    > - 5.7.1 < MySQL 版本 < 5.8
+    > - MariaDB 版本 >= 10.1.3
+    
+    在使用 dmctl 启动任务时，DM 会自动对任务上下游数据库的配置、权限等进行[前置检查](/reference/tools/data-migration/precheck.md)。
+
+- DDL 语法
+    
+    - 目前，TiDB 部分兼容 MySQL 支持的 DDL 语句。因为 DM 使用 TiDB parser 来解析处理 DDL 语句，所以目前仅支持 TiDB parser 支持的 DDL 语法。详见 [TiDB DDL 语法支持](/reference/mysql-compatibility.md#ddl)。
+    
+    - DM 遇到不兼容的 DDL 语句时会报错。要解决此报错，需要使用 dmctl 手动处理，要么跳过该 DDL 语句，要么用指定的 DDL 语句来替换它。
+
+- 分库分表
+    
+    - 如果业务分库分表之间存在数据冲突，冲突的列**只有自增主键列**，并且**列的类型是 bigint**，可以尝试使用 [Column mapping](/reference/tools/data-migration/features/overview.md#column-mapping) 来解决；否则不推荐使用 DM 进行同步，如果进行同步则有冲突的数据会相互覆盖造成数据丢失。
+    - 关于分库分表合并场景的其它限制，参见[使用限制](/reference/tools/data-migration/features/shard-merge.md#使用限制)。
+- 操作限制
+    
+    - DM-worker 重启后不能自动恢复数据同步任务，需要使用 dmctl 手动执行 `start-task`。详见[管理数据同步任务](/reference/tools/data-migration/manage-tasks.md)。
+    - 在一些情况下，DM-worker 重启后不能自动恢复 DDL lock 同步，需要手动处理。详见[手动处理 Sharding DDL Lock](/reference/tools/data-migration/features/manually-handling-sharding-ddl-locks.md)。
