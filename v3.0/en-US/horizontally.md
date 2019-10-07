@@ -9,7 +9,7 @@ aliases:
 
 TiDB 集群可以在不影响线上服务的情况下动态进行扩容和缩容。
 
-> **注意：**
+> **Note:**
 > 
 > 如果使用 Ansible 部署 TiDB 集群，请参考[使用 Ansible 扩容缩容](/how-to/scale/with-ansible.md)。
 
