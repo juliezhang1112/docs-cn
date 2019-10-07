@@ -13,7 +13,7 @@ aliases:
 
 - [aliyun-cli](https://github.com/aliyun/aliyun-cli) >= 3.0.15 并且[配置 aliyun-cli](https://www.alibabacloud.com/help/doc-detail/90766.htm?spm=a2c63.l28256.a3.4.7b52a893EFVglq)
     
-    > **注意：**
+    > **Note:**
     > 
     > Access Key 需要具有操作相应资源的权限。
 
@@ -204,7 +204,7 @@ terraform state rm module.ack.alicloud_cs_managed_kubernetes.k8s
 
 销毁集群操作需要执行较长时间。
 
-> **注意：**
+> **Note:**
 > 
 > 监控组件挂载的云盘需要在阿里云管理控制台中手动删除。
 
