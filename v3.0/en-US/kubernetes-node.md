@@ -17,7 +17,7 @@ TiDB 是高可用数据库，可以在部分数据库节点下线的情况下正
 - [`tkctl`](/tidb-in-kubernetes/reference/tools/tkctl.md)
 - [`jq`](https://stedolan.github.io/jq/download/)
 
-> **注意：**
+> **Note:**
 > 
 > 长期维护节点前，需要保证 Kubernetes 集群的剩余资源足够运行 TiDB 集群。
 
@@ -150,7 +150,7 @@ pd-ctl -d config set max-store-down-time 10m
 
 3. 使用 `pd-ctl` 主动下线 TiKV 实例。
     
-    > **注意：**
+    > **Note:**
     > 
     > 下线 TiKV 实例前，需要保证集群中剩余的 TiKV 实例数不少于 PD 配置中的 TiKV 数据副本数（配置项：`max-replicas`）。假如不符合该条件，需要先操作扩容 TiKV。
     
