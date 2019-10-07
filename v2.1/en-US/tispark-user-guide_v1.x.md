@@ -108,7 +108,7 @@ TiSpark 的 jar 包可以在[这里](http://download.pingcap.org/tispark-0.1.0-S
 
 对于 Standalone 模式且无需 Hadoop 支持，则选择 Spark 2.1.x 且带有 Hadoop 依赖的 Pre-build with Apache Hadoop 2.x 任意版本。如有需要配合使用的 Hadoop 集群，则选择对应的 Hadoop 版本号。你也可以选择从源代码[自行构建](https://spark.apache.org/docs/2.1.0/building-spark.html)以配合官方 Hadoop 2.6 之前的版本。
 
-> **注意：**
+> **Note:**
 > 
 > 目前 TiSpark 仅支持 Spark 2.1.x 版本。
 
