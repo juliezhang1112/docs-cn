@@ -81,7 +81,7 @@ kubectl logs -n <namespace> <tidbPodName> -c slowlog
 
 对于 3.0 及更新的版本，TiDB 将慢查询日志输出到独立的 `slowlog.log` 文件中，并且 `separateSlowLog` 是默认开启的，所以可以直接通过 sidecar 容器查看慢查询日志，无需额外设置。
 
-> **注意：**
+> **Note:**
 > 
 > 慢查询日志的格式与 MySQL 的慢查询日志相同，但由于 TiDB 自身的特点，其中的一些具体字段可能存在差异，因此解析 MySQL 慢查询日志的工具不一定能完全兼容 TiDB 的慢查询日志。
 
