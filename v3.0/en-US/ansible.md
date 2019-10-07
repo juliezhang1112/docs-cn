@@ -153,13 +153,13 @@ $ cd /home/tidb/tidb-ansible $ vi hosts.ini [servers] 172.16.10.1 172.16.10.2 17
 
 $ ansible-playbook -i hosts.ini create_users.yml -u root -k
 
-    <br />&gt; 手工配置 ssh 互信及 sudo 免密码可参考[如何手工配置 ssh 互信及 sudo 免密码](#如何手工配置-ssh-互信及-sudo-免密码)。
+    <br />> 手工配置 ssh 互信及 sudo 免密码可参考[如何手工配置 ssh 互信及 sudo 免密码](#如何手工配置-ssh-互信及-sudo-免密码)。
     
     ## 在部署目标机器上安装 NTP 服务
     
-    &gt; 如果你的部署目标机器时间、时区设置一致，已开启 NTP 服务且在正常同步时间，此步骤可忽略。可参考[如何检测 NTP 服务是否正常](#如何检测-ntp-服务是否正常)。
-    &gt; 该步骤将在部署目标机器上使用系统自带软件源联网安装并启动 NTP 服务，服务使用安装包默认的 NTP server 列表，见配置文件 `/etc/ntp.conf` 中 server 参数，如果使用默认的 NTP server，你的机器需要连接外网。
-    &gt; 为了让 NTP 尽快开始同步，启动 NTP 服务前，系统会 ntpdate `hosts.ini` 文件中的 `ntp_server` 一次，默认为 `pool.ntp.org`，也可替换为你的 NTP server。
+    > 如果你的部署目标机器时间、时区设置一致，已开启 NTP 服务且在正常同步时间，此步骤可忽略。可参考[如何检测 NTP 服务是否正常](#如何检测-ntp-服务是否正常)。
+    > 该步骤将在部署目标机器上使用系统自带软件源联网安装并启动 NTP 服务，服务使用安装包默认的 NTP server 列表，见配置文件 `/etc/ntp.conf` 中 server 参数，如果使用默认的 NTP server，你的机器需要连接外网。
+    > 为了让 NTP 尽快开始同步，启动 NTP 服务前，系统会 ntpdate `hosts.ini` 文件中的 `ntp_server` 一次，默认为 `pool.ntp.org`，也可替换为你的 NTP server。
     
     以 `tidb` 用户登录中控机，执行以下命令：
     
@@ -171,7 +171,7 @@ $ cd /home/tidb/tidb-ansible $ ansible-playbook -i hosts.ini deploy_ntp.yml -u t
     
     为了让 CPU 发挥最大性能，请将 CPUfreq 调节器模式设置为 `performance` 模式。
     
-    &gt; 你可以查看[使用 CPUFREQ 调控器](https://access.redhat.com/documentation/zh-cn/red_hat_enterprise_linux/7/html/power_management_guide/cpufreq_governors#cpufreq_setup)文档, 了解更多 CPUFREQ 相关信息。
+    > 你可以查看[使用 CPUFREQ 调控器](https://access.redhat.com/documentation/zh-cn/red_hat_enterprise_linux/7/html/power_management_guide/cpufreq_governors#cpufreq_setup)文档, 了解更多 CPUFREQ 相关信息。
     
     你可以通过 `cpupower` 命令查看系统支持的调节器模式：
     
@@ -213,7 +213,7 @@ $ ansible -i hosts.ini all -m shell -a "cpupower frequency-set --governor perfor
     
     部署目标机器数据盘请格式化成 ext4 文件系统，挂载时请添加 nodelalloc 和 noatime 挂载参数。`nodelalloc` 是必选参数，否则 Ansible 安装时检测无法通过，noatime 是可选建议参数。
     
-    &gt; 如果你的数据盘已经格式化成 ext4 并挂载，可先执行 `umount` 命令卸载，从编辑 `/etc/fstab` 文件步骤开始执行，添加挂载参数重新挂载即可。
+    > 如果你的数据盘已经格式化成 ext4 并挂载，可先执行 `umount` 命令卸载，从编辑 `/etc/fstab` 文件步骤开始执行，添加挂载参数重新挂载即可。
     
       ```
       # umount /dev/nvme0n1
@@ -277,9 +277,9 @@ UUID=c51eb23b-195c-4061-92a9-3fad812cc12f /data1 ext4 defaults,nodelalloc,noatim
     
     以 `tidb` 用户登录中控机，`inventory.ini` 文件路径为 `/home/tidb/tidb-ansible/inventory.ini`。
     
-    &gt; **注意：**
-    &gt;
-    &gt; 请使用内网 IP 来部署集群，如果部署目标机器 SSH 端口非默认 22 端口，需添加 `ansible_port` 变量，如 `TiDB1 ansible_host=172.16.10.1 ansible_port=5555`。
+    > **注意：**
+    >
+    > 请使用内网 IP 来部署集群，如果部署目标机器 SSH 端口非默认 22 端口，需添加 `ansible_port` 变量，如 `TiDB1 ansible_host=172.16.10.1 ansible_port=5555`。
     
     标准 TiDB 集群需要 6 台机器:
     
