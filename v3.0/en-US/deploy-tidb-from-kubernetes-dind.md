@@ -22,13 +22,13 @@ DinD 将 Docker 容器作为虚拟机运行，并在第一层 Docker 容器中�
 
 - 资源需求 CPU 2+，Memory 4G+
     
-    > **注意：**
+    > **Note:**
     > 
     > 对于 macOS 系统，需要给 Docker 分配 2+ CPU 和 4G+ Memory。详情请参考 [Mac 上配置 Docker](https://docs.docker.com/docker-for-mac/#advanced)。
 
 - [Docker](https://docs.docker.com/install/)：>= 17.03
     
-    > **注意：**
+    > **Note:**
     > 
     > - 由于 DinD 不能在 Docker Toolbox 或者 Docker Machine 上运行，[Legacy Docker Toolbox](https://docs.docker.com/toolbox/toolbox_install_mac/) 用户必须卸载 Legacy Docker Toolbox 并安装 [Docker for Mac](https://store.docker.com/editions/community/docker-ce-desktop-mac)。
     > - 安装过程中，`kubeadm` 会检查 Docker 版本。如果 Docker 版本比 18.06 更新，安装过程会打印警告信息。集群可能仍然能正常工作，但是为保证更好的兼容性，建议 Docker 版本在 17.03 和 18.06 之间。你可以在[此处](https://download.docker.com/)下载旧版本 Docker。
@@ -37,7 +37,7 @@ DinD 将 Docker 容器作为虚拟机运行，并在第一层 Docker 容器中�
 
 - [Kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl): 至少 1.10，建议 1.13 或更高版本
     
-    > **注意：**
+    > **Note:**
     > 
     > 不同版本 `kubectl` 输出可能略有不同。
 
@@ -158,7 +158,7 @@ kubectl get nodes -o wide
 
 ## 第 2 步：在 DinD Kubernetes 集群中部署 TiDB Operator
 
-> **注意：**
+> **Note:**
 > 
 > `<chartVersion>` 在后续文档中代表 chart 版本，例如 `v1.0.0`。
 
@@ -312,7 +312,7 @@ kubectl get pod -n tidb
 
 通过 `kubectl port-forward` 暴露服务到主机，可以访问 TiDB 集群。命令中的端口格式为：`<主机端口>:<k8s 服务端口>`。
 
-> **注意：**
+> **Note:**
 > 
 > 如果你不是在本地 PC 而是在远程主机上部署的 DinD 环境，可能无法通过 localhost 访问远程主机的服务。如果使用 `kubectl` 1.13 或者更高版本，可以在执行 `kubectl port-forward` 命令时添加 `--address 0.0.0.0` 选项，在 `0.0.0.0` 暴露端口而不是默认的 `127.0.0.1`。
 
@@ -327,7 +327,7 @@ kubectl get pod -n tidb
             shell
                 kubectl port-forward svc/demo-tidb 4000:4000 --namespace=tidb
         
-        > **注意：**
+        > **Note:**
         > 
         > 如果代理建立成功，会打印类似输出：`Forwarding from 0.0.0.0:4000 -> 4000`。测试完成后按 `Ctrl + C` 停止代理并退出。
     
@@ -347,7 +347,7 @@ kubectl get pod -n tidb
             shell
               kubectl port-forward svc/demo-grafana 3000:3000 --namespace=tidb
         
-        > **注意：**
+        > **Note:**
         > 
         > 如果代理建立成功，会打印类似输出：`Forwarding from 0.0.0.0:3000 -> 3000`。测试完成后按 `Ctrl + C` 停止代理并退出。
     
@@ -433,7 +433,7 @@ kubectl get pod -n tidb
     helm upgrade demo pingcap/tidb-cluster --namespace=tidb -f /home/tidb/demo/values-demo.yaml --version=<chartVersion>
     ```
 
-> **注意：**
+> **Note:**
 > 
 > 如果要缩容 TiKV，因为要安全地迁移数据，缩容需要的时间取决于已有数据量的大小。
 
@@ -488,7 +488,7 @@ kubectl get pod -n tidb
 helm delete demo --purge
 ```
 
-> **注意：**
+> **Note:**
 > 
 > 上述命令只是删除运行的 Pod，数据仍然会保留。
 
