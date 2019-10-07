@@ -25,7 +25,7 @@ DM-Ansible 是 PingCAP 基于 [Ansible](https://docs.ansible.com/ansible/latest/
 
 ## 第 1 步：在中控机上安装依赖包
 
-> **注意：**
+> **Note:**
 > 
 > 请确保使用 `root` 账户登录中控机。
 
@@ -43,7 +43,7 @@ DM-Ansible 是 PingCAP 基于 [Ansible](https://docs.ansible.com/ansible/latest/
 
 ## 第 2 步：在中控机上创建 `tidb` 用户，并生成 SSH 密钥
 
-> **注意：**
+> **Note:**
 > 
 > 请确保使用 `root` 账户登录中控机。
 
@@ -104,7 +104,7 @@ DM-Ansible 是 PingCAP 基于 [Ansible](https://docs.ansible.com/ansible/latest/
 
 ## 第 3 步：下载 DM-Ansible 至中控机
 
-> **注意：**
+> **Note:**
 > 
 > 请确保使用 `tidb` 账户登录中控机。
 
@@ -120,7 +120,7 @@ DM-Ansible 是 PingCAP 基于 [Ansible](https://docs.ansible.com/ansible/latest/
 
 ## 第 4 步：安装 DM-Ansible 及其依赖至中控机
 
-> **注意：**
+> **Note:**
 > 
 > - 请确保使用 `tidb` 账户登录中控机。
 > - 您需要使用 `pip` 方式下载安装 Ansible 及其依赖，否则可能会遇到兼容性问题。 DM-Ansible 当前与 Ansible 2.5 或更高版本兼容。
@@ -146,7 +146,7 @@ DM-Ansible 是 PingCAP 基于 [Ansible](https://docs.ansible.com/ansible/latest/
 
 ## 第 5 步：在中控机上配置 SSH 互信和 sudo 规则
 
-> **注意：**
+> **Note:**
 > 
 > 请确保使用 `tidb` 账户登录至中控机。
 
@@ -175,7 +175,7 @@ DM-Ansible 是 PingCAP 基于 [Ansible](https://docs.ansible.com/ansible/latest/
 
 ## 第 6 步：下载 DM 及监控组件安装包至中控机
 
-> **注意：**
+> **Note:**
 > 
 > 请确保中控机接入互联网。
 
@@ -187,7 +187,7 @@ ansible-playbook local_prepare.yml
 
 ## 第 7 步：编辑 `inventory.ini` 配置文件
 
-> **注意：**
+> **Note:**
 > 
 > 请确保使用 `tidb` 账户登录中控机。
 
@@ -364,7 +364,7 @@ dm-worker1 ansible_host=172.16.10.72 source_id="mysql-replica-01" server_id=101 
 dm-worker2 ansible_host=172.16.10.73 source_id="mysql-replica-02" server_id=102 relay_binlog_name="binlog.000002" mysql_host=172.16.10.82 mysql_user=root mysql_password='VjX8cEeTX+qcvZ3bPaO4h0C80pe/1aU=' mysql_port=3306
 ```
 
-> **注意：**
+> **Note:**
 > 
 > 如未设定 `relay_binlog_name`，DM-worker 将从上游 MySQL 或 MariaDB 现有最早时间点的 binlog 文件开始拉取 binlog。拉取到数据同步任务需要的最新 binlog 可能需要很长时间。
 
