@@ -143,7 +143,7 @@ helm search tidb-operator -l
 
 ## 部署 TiDB 集群
 
-> **注意：**
+> **Note:**
 > 
 > `<chartVersion>` 在后面文档中代表 chart 版本，例如 `v1.0.0`。
 
@@ -232,7 +232,7 @@ select tidb_version();
 SET PASSWORD FOR 'root'@'%' = '<change-to-your-password>';
 ```
 
-> **注意：**
+> **Note:**
 > 
 > 这条命令中包含一些特殊字符，Google Cloud Shell 无法自动填充，你需要手动复制、粘贴到控制台中。
 
