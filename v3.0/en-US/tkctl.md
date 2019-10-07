@@ -228,7 +228,7 @@ tkctl get volume
 | --privileged    |    | 是否为 debug 容器开启 [privileged](https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities) 模式 |
 
 
-> **注意：**
+> **Note:**
 > 
 > Debug 容器使用的默认镜像包含了绝大多数的诊断工具，因此体积较大，假如只需要 `pd-ctl` 和 `tidb-ctl`，可以使用 `--image=pingcap/tidb-control:latest` 来指定使用 `tidb-control` 镜像。
 
