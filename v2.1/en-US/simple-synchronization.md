@@ -125,7 +125,7 @@ category: reference
         action: Ignore
     ```
     
-    > **注意：**
+    > **Note:**
     > 
     > `store-filter-rule` 不同于 `log-filter-rule` 和 `user-filter-rule`。`store-filter-rule` 是针对整个 `store` 库的规则，而 `log-filter-rule` 和 `user-filter-rule` 是针对 `user` 库中 `log` 表的规则。
 
