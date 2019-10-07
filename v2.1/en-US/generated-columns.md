@@ -22,7 +22,7 @@ CREATE TABLE person (
 
 为 JSON 列添加索引之前，首先必须抽取该列为 generated stored column。
 
-> **注意：**
+> **Note:**
 > 
 > 必须是 generated stored column 上建立的索引才能被优化器使用到，如果在 generated virtual column 上建立索引，优化器目前将无法使用这个索引，会在后续版本中改进（ISSUE [#5189](https://github.com/pingcap/tidb/issues/5189)）。
 
