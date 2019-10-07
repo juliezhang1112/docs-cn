@@ -25,7 +25,7 @@ mkdir -p /home/tidb/<release-name> && \
 helm inspect values pingcap/tidb-cluster --version=<chart-version> > /home/tidb/<release-name>/values-<release-name>.yaml
 ```
 
-> **注意：**
+> **Note:**
 > 
 > - `/home/tidb` 可以替换为你想用的目录。
 > - `release-name` 将会作为 Kubernetes 相关资源（例如 Pod，Service 等）的前缀名，可以起一个方便记忆的名字，要求全局唯一，通过 `helm ls -q` 可以查看集群中已经有的 `release-name`。
