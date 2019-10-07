@@ -1,55 +1,39 @@
 ---
-title: 数据迁移概述
-category: how-to
+title: DM 配置简介
+category: reference
 aliases:
-  - '/docs-cn/op-guide/migration-overview/'
+  - '/docs-cn/tools/dm/dm-configuration-file-overview/'
 ---
 
-# 数据迁移概述
+# DM 配置简介
 
-本文档介绍了 TiDB 提供的数据迁移工具，以及不同迁移场景下如何选择迁移工具，从而将数据从 MySQL 或 CSV 数据源迁移到 TiDB。
+本文档简要介绍 DM (Data Migration) 的配置文件和数据同步任务的配置。
 
-## 迁移工具
+## 配置文件
 
-在上述数据迁移过程中会用到如下工具：
+- `inventory.ini`：使用 DM-Ansible 部署 DM 集群的配置文件。需要根据所选用的集群拓扑来进行编辑。详见[编辑 `inventory.ini` 配置文件](/how-to/deploy/data-migration-with-ansible.md#第-7-步-编辑-inventory-ini-配置文件)。
+- `dm-master.toml`：DM-master 进程的配置文件，包括 DM 集群的拓扑信息、MySQL 实例与 DM-worker 之间的关系（必须为一对一的关系）。使用 DM-Ansible 部署 DM 集群时，会自动生成 `dm-master.toml` 文件。
+- `dm-worker.toml`：DM-worker 进程的配置文件，包括上游 MySQL 实例的配置和 relay log 的配置。使用 DM-Ansible 部署 DM 集群时，会自动生成 `dm-worker.toml` 文件。
 
-- [Mydumper](/reference/tools/mydumper.md)：用于从 MySQL 导出数据。建议使用 Mydumper，而非 mysqldump。
-- [Loader](/reference/tools/loader.md)：用于将 Mydumper 导出格式的数据导入到 TiDB。
-- [Syncer](/reference/tools/syncer.md)：用于将数据从 MySQL 增量同步到 TiDB。
-- [DM (Data Migration)](/reference/tools/data-migration/overview.md)：集成了 Mydumper、Loader、Syncer 的功能，支持 MySQL 数据的全量导出和到 TiDB 的全量导入，还支持 MySQL binlog 数据到 TiDB 的增量同步。
-- [TiDB-Lightning](/reference/tools/tidb-lightning/overview.md)：用于将全量数据高速导入到 TiDB 集群。例如，如果要导入超过 1TiB 的数据，使用 Loader 往往需花费几十个小时，而使用 TiDB-Lighting 的导入速度至少是 Loader 的三倍。
+## 同步任务配置
 
-## 迁移场景
+### 任务配置文件
 
-本小节将通过几个示例场景来说明如何选择和使用 TiDB 的迁移工具。
+使用 DM-Ansible 部署 DM 集群时，`<path-to-dm-ansible>/conf` 中提供了任务配置文件模板：`task.yaml.exmaple` 文件。该文件是 DM 同步任务配置的标准文件，每一个具体的任务对应一个 `task.yaml` 文件。关于该配置文件的详细介绍，参见 [任务配置文件](/reference/tools/data-migration/configure/task-configuration-file.md)。
 
-### MySQL 数据的全量迁移
+### 创建数据同步任务
 
-要将数据从 MySQL 全量迁移至 TiDB，可以采用以下三种方案中一种：
+你可以基于 `task.yaml.example` 文件来创建数据同步任务，具体步骤如下：
 
-- **Mydumper + Loader**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 Loader 将数据导入至 TiDB。
-- **Mydumper + TiDB-Lightning**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 TiDB-Lightning 将数据导入至 TiDB。
-- **DM**：直接使用 DM 将数据从 MySQL 导出，然后将数据导入至 TiDB。
+1. 复制 `task.yaml.example` 为 `your_task.yaml`。
+2. 参考[任务配置文件](/reference/tools/data-migration/configure/task-configuration-file.md)来修改 `your_task.yaml` 文件。
+3. [使用 dmctl 创建数据同步任务](/reference/tools/data-migration/manage-tasks.md#创建数据同步任务)。
 
-详细操作参见 [MySQL 数据到 TiDB 的全量迁移](/how-to/migrate/from-mysql.md)。
+### 关键概念
 
-### MySQL 数据的全量迁移和增量同步
+DM 配置的关键概念如下：
 
-- **Mydumper + Loader + Syncer**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 Loader 将数据导入至 TiDB，再使用 Syncer 将 MySQL binlog 数据增量同步至 TiDB。
-- **Mydumper + TiDB-Lightning + Syncer**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 TiDB-Lightning 将数据导入至 TiDB，再使用 Syncer 将 MySQL binlog 数据增量同步至 TiDB。
-- **DM**：先使用 DM 将数据从 MySQL 全量迁移至 TiDB，然后使用 DM 将 MySQL binlog 数据增量同步至 TiDB。
-
-详细操作参见 [MySQL 数据到 TiDB 的增量同步](/how-to/migrate/incrementally-from-mysql.md)。
-
-> **注意：**
-> 
-> 在将 MySQL binlog 数据增量同步至 TiDB 前，需要[在 MySQL 中开启 binlog 功能](http://dev.mysql.com/doc/refman/5.7/en/replication-howto-masterbaseconfig.html)，并且 binlog 必须[使用 `ROW` 格式](https://dev.mysql.com/doc/refman/5.7/en/binary-log-formats.html)。
-
-### 非 MySQL 数据源的数据迁移
-
-如果源数据库不是 MySQL，建议采用以下步骤进行数据迁移：
-
-1. 将数据导出为 CSV 格式。
-2. 使用 TiDB-Lightning 将 CSV 格式的数据导入 TiDB。
-
-详细操作参见[使用 TiDB-Lightning 迁移 CSV 数据](/reference/tools/tidb-lightning/csv.md)。
+| 概念           | 解释                                                        | 配置文件                                                                                             |
+|:------------ |:--------------------------------------------------------- |:------------------------------------------------------------------------------------------------ |
+| source-id    | 唯一确定一个 MySQL 或 MariaDB 实例，或者一个具有主从结构的复制组，字符串长度不大于 32      | `inventory.ini` 的 `source_id`；<br> `dm-master.toml` 的 `source-id`；<br> `task.yaml` 的 `source-id` |
+| DM-worker ID | 唯一确定一个 DM-worker（取值于 `dm-worker.toml` 的 `worker-addr` 参数） | `dm-worker.toml` 的 `worker-addr`；<br> dmctl 命令行的 `-worker` / `-w` flag                           |
