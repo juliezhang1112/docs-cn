@@ -1,38 +1,40 @@
 ---
-title: TiDB Lightning 简介
+title: DM 配置简介
 category: reference
 ---
 
-# TiDB Lightning 简介
+# DM 配置简介
 
-TiDB Lightning 是一个将全量数据高速导入到 TiDB 集群的工具，有以下两个主要的使用场景：一是大量新数据的快速导入；二是全量数据的备份恢复。目前，支持 mydumper 或 CSV 输出格式的数据源。您可以在以下两种场景下使用 Lightning：
+本文档简要介绍 DM (Data Migration) 的配置文件和数据同步任务的配置。
 
-- **迅速**导入**大量新**数据。
-- 备份恢复所有数据。
+## 配置文件
 
-## TiDB Lightning 整体架构
+- `inventory.ini`：使用 DM-Ansible 部署 DM 集群的配置文件。需要根据所选用的集群拓扑来进行编辑。详见[编辑 `inventory.ini` 配置文件](/how-to/deploy/data-migration-with-ansible.md#第-7-步-编辑-inventory-ini-配置文件)。
+- `dm-master.toml`：DM-master 进程的配置文件，包括 DM 集群的拓扑信息、MySQL 实例与 DM-worker 之间的关系（必须为一对一的关系）。使用 DM-Ansible 部署 DM 集群时，会自动生成 `dm-master.toml` 文件。
+- `dm-worker.toml`：DM-worker 进程的配置文件，包括上游 MySQL 实例的配置和 relay log 的配置。使用 DM-Ansible 部署 DM 集群时，会自动生成 `dm-worker.toml` 文件。
 
-TiDB Lightning 主要包含两个部分:
+## 同步任务配置
 
-- **`tidb-lightning`**（“前端”）：主要完成适配工作，通过读取数据源，在下游 TiDB 集群建表、将数据转换成键/值对 (KV 对) 发送到 `tikv-importer`、检查数据完整性等。
-- **`tikv-importer`**（“后端”）：主要完成将数据导入 TiKV 集群的工作，把 `tidb-lightning` 写入的 KV 对缓存、排序、切分并导入到 TiKV 集群。
+### 任务配置文件
 
-![TiDB Lightning 其整体架构](/media/tidb-lightning-architecture.png)
+使用 DM-Ansible 部署 DM 集群时，`<path-to-dm-ansible>/conf` 中提供了任务配置文件模板：`task.yaml.exmaple` 文件。该文件是 DM 同步任务配置的标准文件，每一个具体的任务对应一个 `task.yaml` 文件。关于该配置文件的详细介绍，参见 [任务配置文件](/reference/tools/data-migration/configure/task-configuration-file.md)。
 
-TiDB Lightning 整体工作原理如下：
+### 创建数据同步任务
 
-1. 在导数据之前，`tidb-lightning` 会自动将 TiKV 集群切换为“导入模式” (import mode)，优化写入效率并停止自动压缩 (compaction)。
+你可以基于 `task.yaml.example` 文件来创建数据同步任务，具体步骤如下：
 
-2. `tidb-lightning` 会在目标数据库建立架构和表，并获取其元数据。
+1. 复制 `task.yaml.example` 为 `your_task.yaml`。
+2. 参考[任务配置文件](/reference/tools/data-migration/configure/task-configuration-file.md)来修改 `your_task.yaml` 文件。
+3. [使用 dmctl 创建数据同步任务](/reference/tools/data-migration/manage-tasks.md#创建数据同步任务)。
 
-3. 每张表都会被分割为多个连续的*区块*，这样来自大表（200 GB+）的数据就可以用增量方式导入。
+### 关键概念
 
-4. `tidb-lightning` 会通过 gRPC 让 `tikv-importer` 为每一个区块准备一个“引擎文件 (engine file)”来处理 KV 对。`tidb-lightning` 会并发读取 SQL dump，将数据源转换成与 TiDB 相同编码的 KV 对，然后发送到 `tikv-importer` 里对应的引擎文件。
+DM 配置的关键概念如下：
 
-5. 当一个引擎文件数据写入完毕时，`tikv-importer` 便开始对目标 TiKV 集群数据进行分裂和调度，然后导入数据到 TiKV 集群。
-    
-    引擎文件包含两种：*数据引擎*与*索引引擎*，各自又对应两种 KV 对：行数据和次级索引。通常行数据在数据源里是完全有序的，而次级索引是无序的。因此，数据引擎文件在对应区块写入完成后会被立即上传，而所有的索引引擎文件只有在整张表所有区块编码完成后才会执行导入。
-
-6. 整张表相关联的所有引擎文件完成导入后，`tidb-lightning` 会对比本地数据源及下游集群的校验和 (checksum)，确保导入的数据无损，以及让 TiDB 分析 (`ANALYZE`) 这些新增的数据，以优化日后的操作。
-
-7. 在所有步骤完毕后，`tidb-lightning` 自动将 TiKV 切换回“普通模式” (normal mode)，此后 TiDB 集群可以正常对外提供服务。
+| 概念           | 解释                                                        | 配置文件                                                                                         |
+|:------------ |:--------------------------------------------------------- |:-------------------------------------------------------------------------------------------- |
+| source-id    | 唯一确定一个 MySQL 或 MariaDB 实例，或者一个具有主从结构的复制组，字符串长度不大于 32      | `inventory.ini` 的 `source_id`；  
+`dm-master.toml` 的 `source-id`；  
+`task.yaml` 的 `source-id` |
+| DM-worker ID | 唯一确定一个 DM-worker（取值于 `dm-worker.toml` 的 `worker-addr` 参数） | `dm-worker.toml` 的 `worker-addr`；  
+dmctl 命令行的 `-worker` / `-w` flag                         |
