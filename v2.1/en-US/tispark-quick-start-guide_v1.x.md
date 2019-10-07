@@ -56,7 +56,7 @@ export PATH=$JAVA_HOME/bin:$PATH
     ./sample_data.sh
     
 
-> **注意：**
+> **Note:**
 > 
 > 执行脚本的机器上需要安装 MySQL client，CentOS 用户可通过 `yum -y install mysql` 来安装。
 
