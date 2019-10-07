@@ -1,70 +1,53 @@
 ---
-title: 跨数据中心部署方案
+title: 数据迁移概述
 category: how-to
 ---
 
-# 跨数据中心部署方案
+# 数据迁移概述
 
-作为 NewSQL 数据库，TiDB 兼顾了传统关系型数据库的优秀特性以及 NoSQL 数据库可扩展性，以及跨数据中心（下文简称“中心”）场景下的高可用。本文档旨在介绍跨数据中心部署的不同解决方案。
+本文档介绍了 TiDB 提供的数据迁移工具，以及不同迁移场景下如何选择迁移工具，从而将数据从 MySQL 或 CSV 数据源迁移到 TiDB。
 
-## 三中心部署方案
+## 迁移工具
 
-TiDB, TiKV, PD 分别分布在 3 个不同的中心，这是最常规，可用性最高的方案。
+在上述数据迁移过程中会用到如下工具：
 
-![三中心部署](/media/deploy-3dc.png)
+- [Mydumper](/reference/tools/mydumper.md)：用于从 MySQL 导出数据。建议使用 Mydumper，而非 mysqldump。
+- [Loader](/reference/tools/loader.md)：用于将 Mydumper 导出格式的数据导入到 TiDB。
+- [Syncer](/reference/tools/syncer.md)：用于将数据从 MySQL 增量同步到 TiDB。
+- [DM (Data Migration)](/reference/tools/data-migration/overview.md)：集成了 Mydumper、Loader、Syncer 的功能，支持 MySQL 数据的全量导出和到 TiDB 的全量导入，还支持 MySQL binlog 数据到 TiDB 的增量同步。
+- [TiDB-Lightning](/reference/tools/tidb-lightning/overview.md)：用于将全量数据高速导入到 TiDB 集群。例如，如果要导入超过 1TiB 的数据，使用 Loader 往往需花费几十个小时，而使用 TiDB-Lighting 的导入速度至少是 Loader 的三倍。
 
-### 优点
+## 迁移场景
 
-所有数据的副本分布在三个数据中心，任何一个数据中心失效后，另外两个数据中心会自动发起 leader election，并在合理长的时间内（通常情况 20s 以内）恢复服务，并且不会产生数据丢失。
+本小节将通过几个示例场景来说明如何选择和使用 TiDB 的迁移工具。
 
-![三中心部署容灾](/media/deploy-3dc-dr.png)
+### MySQL 数据的全量迁移
 
-### 缺点
+要将数据从 MySQL 全量迁移至 TiDB，可以采用以下三种方案中一种：
 
-性能受网络延迟影响。
+- **Mydumper + Loader**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 Loader 将数据导入至 TiDB。
+- **Mydumper + TiDB-Lightning**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 TiDB-Lightning 将数据导入至 TiDB。
+- **DM**：直接使用 DM 将数据从 MySQL 导出，然后将数据导入至 TiDB。
 
-- 对于写入的场景，所有写入的数据需要同步复制到至少 2 个数据中心，由于 TiDB 写入过程使用两阶段提交，故写入延迟至少需要 2 倍数据中心间的延迟。
-- 对于读请求来说，如果数据 leader 与发起读取的 TiDB 节点不在同一个数据中心，也会受网络延迟影响。
-- TiDB 中的每个事务都需要向 PD leader 获取 TSO，当 TiDB 与 PD leader 不在同一个数据中心时，它上面运行的事务也会因此受网络延迟影响，每个有写入的事务会获取两次 TSO。
+详细操作参见 [MySQL 数据到 TiDB 的全量迁移](/how-to/migrate/from-mysql.md)。
 
-### 读性能优化
+### MySQL 数据的全量迁移和增量同步
 
-如果不需要每个数据中心同时对外提供服务，可以将业务流量全部派发到一个数据中心，并通过调度策略把 Region leader 和 PD leader 都迁移到同一个数据中心（我们在上文所述的测试中也做了这个优化）。这样一来，不管是从 PD 获取 TSO 还是读取 Region 都不受数据中心间网络的影响。当该数据中心失效后，PD leader 和 Region leader 会自动在其它数据中心选出，只需要把业务流量转移至其他存活的数据中心即可。
+- **Mydumper + Loader + Syncer**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 Loader 将数据导入至 TiDB，再使用 Syncer 将 MySQL binlog 数据增量同步至 TiDB。
+- **Mydumper + TiDB-Lightning + Syncer**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 TiDB-Lightning 将数据导入至 TiDB，再使用 Syncer 将 MySQL binlog 数据增量同步至 TiDB。
+- **DM**：先使用 DM 将数据从 MySQL 全量迁移至 TiDB，然后使用 DM 将 MySQL binlog 数据增量同步至 TiDB。
 
-![三中心部署读性能优化](/media/deploy-3dc-optimize.png)
-
-## 两地三中心部署方案
-
-两地三中心的方案与三数据中心类似，算是三机房方案根据业务特点进行的优化，区别是其中有两个数据中心距离很近（通常在同一个城市），网络延迟相对很小。这种场景下，我们可以把业务流量同时派发到同城的两个数据中心，同时控制 Region leader 和 PD leader 也分布在同城的两个数据中心。
-
-![两地三中心部署方案](/media/deploy-2city3dc.png)
-
-与三数据中心方案相比，两地三中心有以下优势：
-
-- 写入速度更优
-- 两中心同时提供服务资源利用率更高
-- 依然能保证任何一个数据中心失效后保持可用并且不发生数据丢失
-
-但是，缺陷是如果同城的两个数据中心同时失效（理论上讲要高于异地三数据中心损失 2 个的概率），将会导致不可用以及部分数据丢失。
-
-## 两数据中心 + binlog 同步方案
-
-两数据中心 + binlog 同步类似于传统的 MySQL 中 master/slave 方案。两个数据中心分别部署一套完整的 TiDB 集群，我们称之为主集群和从集群。正常情况下所有的请求都在主集群，写入的数据通过 binlog 异步同步至从集群并写入。
-
-![binlog 同步部署方案](/media/deploy-binlog.png)
-
-当主集群整个数据中心失效后，业务可以切换至从集群，与 MySQL 类似，这种情况下会有一些数据缺失。对比 MySQL，这个方案的优势是数据中心内的 HA -- 少部分节点故障时，通过重新选举 leader 自动恢复服务，不需要人工干预。
-
-![两中心 binlog 相互备份方案](/media/deploy-backup.png)
-
-另外部分用户采用这种方式做双数据中心多活，两个数据中心各有一个集群，将业务分为两个库，每个库服务一部分数据，每个数据中心的业务只会访问一个库，两个集群之间通过 binlog 将本数据中心业务所涉及的库中的数据变更同步到对端机房，形成环状备份。
+详细操作参见 [MySQL 数据到 TiDB 的增量同步](/how-to/migrate/incrementally-from-mysql.md)。
 
 > **注意：**
 > 
-> 在两数据中心 + binlog 同步部署方案中，数据中心之间只有 binlog 异步复制。在数据中心间的延迟较高的情况下，从集群落后主集群的数据量会增大。当主集群故障后（DR），会造成数据丢失，丢失的数据量受网络延迟等因素影响。
+> 在将 MySQL binlog 数据增量同步至 TiDB 前，需要[在 MySQL 中开启 binlog 功能](http://dev.mysql.com/doc/refman/5.7/en/replication-howto-masterbaseconfig.html)，并且 binlog 必须[使用 `ROW` 格式](https://dev.mysql.com/doc/refman/5.7/en/binary-log-formats.html)。
 
-## 高可用和容灾分析
+### 非 MySQL 数据源的数据迁移
 
-对于三数据中心方案和两地三中心方案，我们能得到的保障是任意一个数据中心故障时，集群能自动恢复服务，不需要人工介入，并能保证数据一致性。注意各种调度策略都是用于帮助性能优化的，当发生故障时调度机制总是第一优先考虑可用性而不是性能。
+如果源数据库不是 MySQL，建议采用以下步骤进行数据迁移：
 
-对于两数据中心 + binlog 同步的方案，主集群内少量节点故障时也能自动恢复服务，不需要人工介入，并能保证数据一致性。当整个主集群故障时，需要人工切换至从集群，并可能发生一些数据丢失，数据丢失的数量取决于同步延迟，和网络条件有关。
+1. 将数据导出为 CSV 格式。
+2. 使用 TiDB-Lightning 将 CSV 格式的数据导入 TiDB。
+
+详细操作参见[使用 TiDB-Lightning 迁移 CSV 数据](/reference/tools/tidb-lightning/csv.md)。
