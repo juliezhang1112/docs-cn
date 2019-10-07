@@ -106,6 +106,6 @@ GRANT SELECT,INSERT,UPDATE,DELETE,CREATE,DROP,ALTER,INDEX  ON db.table TO 'your_
 `INDEX`（创建或删除索引） | 本地读/写磁盘 |
 
 
-> **注意：**
+> **Note:**
 > 
 > 这些权限并非一成不变。随着需求改变，这些权限也可能会改变。
