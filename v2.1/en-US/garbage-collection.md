@@ -46,7 +46,7 @@ update mysql.tidb set VARIABLE_VALUE = '24h' where VARIABLE_NAME = 'tikv_gc_life
 
 时长字符串的形式是数字后接时间单位的序列，如 `24h`、`2h30m`、`2.5h`。可以使用的时间单位包括 "h"、"m"、"s"。
 
-> **注意：**
+> **Note:**
 > 
 > 在数据更新频繁的场景下如果将 `tikv_gc_life_time` 设置得比较大（如数天甚至数月），可能会有一些潜在的问题：
 > 
