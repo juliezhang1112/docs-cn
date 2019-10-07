@@ -1,102 +1,55 @@
 ---
-title: TiDB 事务语句
-category: reference
+title: 数据迁移概述
+category: how-to
 aliases:
-  - '/docs-cn/sql/transaction/'
-  - '/docs-cn/dev/reference/sql/statements/transaction/'
+  - '/docs-cn/op-guide/migration-overview/'
 ---
 
-# TiDB 事务语句
+# 数据迁移概述
 
-TiDB 支持分布式事务。涉及到事务的语句包括 `autocommit` 变量、`[BEGIN|START TRANSACTION]`、`COMMIT` 以及 `ROLLBACK`。
+本文档介绍了 TiDB 提供的数据迁移工具，以及不同迁移场景下如何选择迁移工具，从而将数据从 MySQL 或 CSV 数据源迁移到 TiDB。
 
-## 自动提交
+## 迁移工具
 
-语法：
+在上述数据迁移过程中会用到如下工具：
 
-```sql
-SET autocommit = {0 | 1}
-```
+- [Mydumper](/reference/tools/mydumper.md)：用于从 MySQL 导出数据。建议使用 Mydumper，而非 mysqldump。
+- [Loader](/reference/tools/loader.md)：用于将 Mydumper 导出格式的数据导入到 TiDB。
+- [Syncer](/reference/tools/syncer.md)：用于将数据从 MySQL 增量同步到 TiDB。
+- [DM (Data Migration)](/reference/tools/data-migration/overview.md)：集成了 Mydumper、Loader、Syncer 的功能，支持 MySQL 数据的全量导出和到 TiDB 的全量导入，还支持 MySQL binlog 数据到 TiDB 的增量同步。
+- [TiDB-Lightning](/reference/tools/tidb-lightning/overview.md)：用于将全量数据高速导入到 TiDB 集群。例如，如果要导入超过 1TiB 的数据，使用 Loader 往往需花费几十个小时，而使用 TiDB-Lighting 的导入速度至少是 Loader 的三倍。
 
-通过设置 `autocommit` 的值为 1，可以将当前 Session 设置为自动提交状态，0 则表示当前 Session 为非自动提交状态。默认情况下，`autocommit` 的值为 1。
+## 迁移场景
 
-在自动提交状态，每条语句运行后，会将其修改自动提交到数据库中。否则，会等到运行 `COMMIT` 语句或者是某些会造成隐式提交的情况，详见 [implicit commit](https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html)。比如，执行 `[BEGIN|START TRANCATION]` 语句的时候会试图提交上一个事务，并开启一个新的事务。
+本小节将通过几个示例场景来说明如何选择和使用 TiDB 的迁移工具。
 
-另外 `autocommit` 也是一个 System Variable，所以可以通过变量赋值语句修改当前 Session 或者是 Global 的值。
+### MySQL 数据的全量迁移
 
-```sql
-SET @@SESSION.autocommit = {0 | 1};
-SET @@GLOBAL.autocommit = {0 | 1};
-```
+要将数据从 MySQL 全量迁移至 TiDB，可以采用以下三种方案中一种：
 
-## START TRANSACTION, BEGIN
+- **Mydumper + Loader**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 Loader 将数据导入至 TiDB。
+- **Mydumper + TiDB-Lightning**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 TiDB-Lightning 将数据导入至 TiDB。
+- **DM**：直接使用 DM 将数据从 MySQL 导出，然后将数据导入至 TiDB。
 
-语法:
+详细操作参见 [MySQL 数据到 TiDB 的全量迁移](/how-to/migrate/from-mysql.md)。
 
-```sql
-BEGIN;
+### MySQL 数据的全量迁移和增量同步
 
-START TRANSACTION;
+- **Mydumper + Loader + Syncer**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 Loader 将数据导入至 TiDB，再使用 Syncer 将 MySQL binlog 数据增量同步至 TiDB。
+- **Mydumper + TiDB-Lightning + Syncer**：先使用 Mydumper 将数据从 MySQL 导出，然后使用 TiDB-Lightning 将数据导入至 TiDB，再使用 Syncer 将 MySQL binlog 数据增量同步至 TiDB。
+- **DM**：先使用 DM 将数据从 MySQL 全量迁移至 TiDB，然后使用 DM 将 MySQL binlog 数据增量同步至 TiDB。
 
-START TRANSACTION WITH CONSISTENT SNAPSHOT;
-```
-
-上述三条语句都是事务开始语句，效果相同。通过事务开始语句可以显式地开始一个新的事务，如果这个时候当前 Session 正在一个事务中间过程中，会将当前事务提交后，开启一个新的事务。
-
-## COMMIT
-
-语法：
-
-```sql
-COMMIT;
-```
-
-提交当前事务，包括从 `[BEGIN|START TRANSACTION]` 到 `COMMIT` 之间的所有修改。
-
-## ROLLBACK
-
-语法：
-
-```sql
-ROLLBACK;
-```
-
-回滚当前事务，撤销从 `[BEGIN|START TRANSACTION]` 到 `ROLLBACK` 之间的所有修改。
-
-## 显式事务和隐式事务
-
-TiDB 可以显式地使用事务（`[BEGIN|START TRANSACTION]`/`COMMIT`）或者隐式的使用事务（`SET autocommit = 1`）。
-
-如果在 `autocommit = 1` 的状态下，通过 `[BEGIN|START TRANSACTION]` 语句开启一个新的事务，那么在 `COMMIT`/`ROLLBACK` 之前，会禁用 autocommit，也就是变成显式事务。
-
-对于 DDL 语句，会自动提交并且不能回滚。如果运行 DDL 的时候，正在一个事务的中间过程中，会先将当前的事务提交，再执行 DDL。
-
-## 事务隔离级别
-
-TiDB **只支持** `SNAPSHOT ISOLATION`，可以通过下面的语句将当前 Session 的隔离级别设置为 `READ COMMITTED`，这只是语法上的兼容，事务依旧是以 `SNAPSHOT ISOLATION` 来执行。
-
-```sql
-SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
-```
-
-## 事务的惰性检查
-
-TiDB 中，对于普通的 `INSERT` 语句写入的值，会进行惰性检查。惰性检查的含义是，不在 `INSERT` 语句执行时进行唯一约束的检查，而在事务提交时进行唯一约束的检查。
-
-举例：
-
-```sql
-CREATE TABLE T (I INT KEY);
-INSERT INTO T VALUES (1);
-BEGIN;
-INSERT INTO T VALUES (1); -- MySQL 返回错误；TiDB 返回成功
-INSERT INTO T VALUES (2);
-COMMIT; -- MySQL 提交成功；TiDB 返回错误，事务回滚
-SELECT * FROM T; -- MySQL 返回 1 2；TiDB 返回 1
-```
-
-惰性检查的意义在于，如果对事务中每个 `INSERT` 语句都立刻进行唯一性约束检查，将造成很高的网络开销。而在提交时进行一次批量检查，将会大幅提升性能。
+详细操作参见 [MySQL 数据到 TiDB 的增量同步](/how-to/migrate/incrementally-from-mysql.md)。
 
 > **注意：**
 > 
-> 本优化对于 `INSERT IGNORE` 和 `INSERT ON DUPLICATE KEY UPDATE` 不会生效，仅对与普通的 `INSERT` 语句生效。
+> 在将 MySQL binlog 数据增量同步至 TiDB 前，需要[在 MySQL 中开启 binlog 功能](http://dev.mysql.com/doc/refman/5.7/en/replication-howto-masterbaseconfig.html)，并且 binlog 必须[使用 `ROW` 格式](https://dev.mysql.com/doc/refman/5.7/en/binary-log-formats.html)。
+
+### 非 MySQL 数据源的数据迁移
+
+如果源数据库不是 MySQL，建议采用以下步骤进行数据迁移：
+
+1. 将数据导出为 CSV 格式。
+2. 使用 TiDB-Lightning 将 CSV 格式的数据导入 TiDB。
+
+详细操作参见[使用 TiDB-Lightning 迁移 CSV 数据](/reference/tools/tidb-lightning/csv.md)。
