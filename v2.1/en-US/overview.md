@@ -1,18 +1,37 @@
 ---
-title: TiDB 监控框架概述
-category: monitoring
+title: DM 配置简介
+category: reference
 ---
 
-# TiDB 监控框架概述
+# DM 配置简介
 
-TiDB 使用开源时序数据库 Prometheus 作为监控和性能指标信息存储方案，使用 Grafana 作为可视化组件进行展示。
+本文档简要介绍 DM (Data Migration) 的配置文件和数据同步任务的配置。
 
-Prometheus 是一个拥有多维度数据模型，灵活的查询语句的时序数据库。Prometheus 作为热门的开源项目，拥有活跃的社区及众多的成功案例。
+## 配置文件
 
-Prometheus 提供了多个组件供用户使用。目前，我们使用 Prometheus Server，来收集和存储时间序列数据。Client 代码库，在程序中定制需要的 Metric 。Push GateWay 来接收 Client Push 上来的数据，统一供 Prometheus 主服务器抓取。以及 AlertManager 来实现报警机制。其结构如下图：
+- `inventory.ini`：使用 DM-Ansible 部署 DM 集群的配置文件。需要根据所选用的集群拓扑来进行编辑。详见[编辑 `inventory.ini` 配置文件](/how-to/deploy/data-migration-with-ansible.md#第-7-步-编辑-inventory-ini-配置文件)。
+- `dm-master.toml`：DM-master 进程的配置文件，包括 DM 集群的拓扑信息、MySQL 实例与 DM-worker 之间的关系（必须为一对一的关系）。使用 DM-Ansible 部署 DM 集群时，会自动生成 `dm-master.toml` 文件。
+- `dm-worker.toml`：DM-worker 进程的配置文件，包括上游 MySQL 实例的配置和 relay log 的配置。使用 DM-Ansible 部署 DM 集群时，会自动生成 `dm-worker.toml` 文件。
 
-![Prometheus in TiDB](/media/prometheus-in-tidb-v2.1.png)
+## 同步任务配置
 
-Grafana 是一个开源的 metric 分析及可视化系统。我们使用 Grafana 来展示 TiDB 的各项性能指标。如下图所示:
+### 任务配置文件
 
-![Grafana Screeshot](/media/grafana-screenshot-v2.1.png)
+使用 DM-Ansible 部署 DM 集群时，`<path-to-dm-ansible>/conf` 中提供了任务配置文件模板：`task.yaml.exmaple` 文件。该文件是 DM 同步任务配置的标准文件，每一个具体的任务对应一个 `task.yaml` 文件。关于该配置文件的详细介绍，参见 [任务配置文件](/reference/tools/data-migration/configure/task-configuration-file.md)。
+
+### 创建数据同步任务
+
+你可以基于 `task.yaml.example` 文件来创建数据同步任务，具体步骤如下：
+
+1. 复制 `task.yaml.example` 为 `your_task.yaml`。
+2. 参考[任务配置文件](/reference/tools/data-migration/configure/task-configuration-file.md)来修改 `your_task.yaml` 文件。
+3. [使用 dmctl 创建数据同步任务](/reference/tools/data-migration/manage-tasks.md#创建数据同步任务)。
+
+### 关键概念
+
+DM 配置的关键概念如下：
+
+| 概念           | 解释                                                        | 配置文件                                                                                             |
+|:------------ |:--------------------------------------------------------- |:------------------------------------------------------------------------------------------------ |
+| source-id    | 唯一确定一个 MySQL 或 MariaDB 实例，或者一个具有主从结构的复制组，字符串长度不大于 32      | `inventory.ini` 的 `source_id`；<br> `dm-master.toml` 的 `source-id`；<br> `task.yaml` 的 `source-id` |
+| DM-worker ID | 唯一确定一个 DM-worker（取值于 `dm-worker.toml` 的 `worker-addr` 参数） | `dm-worker.toml` 的 `worker-addr`；<br> dmctl 命令行的 `-worker` / `-w` flag                           |
