@@ -1,66 +1,40 @@
 ---
-title: TiDB 简介
-category: introduction
+title: GC 机制简介
+category: reference
 ---
 
-# TiDB 简介
+# GC 机制简介
 
-TiDB 是 PingCAP 公司设计的开源分布式 HTAP (Hybrid Transactional and Analytical Processing) 数据库，结合了传统的 RDBMS 和 NoSQL 的最佳特性。TiDB 兼容 MySQL，支持无限的水平扩展，具备强一致性和高可用性。TiDB 的目标是为 OLTP (Online Transactional Processing) 和 OLAP (Online Analytical Processing) 场景提供一站式的解决方案。
+TiDB 的事务的实现采用了 MVCC（多版本并发控制）机制，当新写入的数据覆盖旧的数据时，旧的数据不会被替换掉，而是与新写入的数据同时保留，并以时间戳来区分版本。GC 的任务便是清理不再需要的旧数据。
 
-TiDB 具备如下特性：
+## 整体流程
 
-- 高度兼容 MySQL
+一个 TiDB 集群中会有一个 TiDB 实例被选举为 GC leader，GC 的运行由 GC leader 来控制。
 
-    [大多数情况下](/reference/mysql-compatibility.md)，无需修改代码即可从 MySQL 轻松迁移至 TiDB，分库分表后的 MySQL 集群亦可通过 TiDB 工具进行实时迁移。
+GC 会被定期触发，默认情况下每 10 分钟一次。每次 GC 时，首先，TiDB 会计算一个称为 safe point 的时间戳（默认为当前时间减去 10 分钟），接下来 TiDB 会在保证 safe point 之后的快照全部拥有正确数据的前提下，删除更早的过期数据。具体而言，分为以下三个步骤：
 
-- 水平弹性扩展
+1. Resolve Locks
+2. Delete Ranges
+3. Do GC
 
-    通过简单地增加新节点即可实现 TiDB 的水平扩展，按需扩展吞吐或存储，轻松应对高并发、海量数据场景。
+### Resolve Locks
 
-- 分布式事务
+TiDB 的事务是基于 [Google Percolator](https://ai.google/research/pubs/pub36726) 模型实现的，事务的提交是一个两阶段提交的过程。第一阶段完成时，所有涉及的 key 会加上一个锁，其中一个锁会被设定为 Primary，其余的锁（Secondary）则会指向 Primary；第二阶段会将 Primary 锁所在的 key 加上一个 Write 记录，并去除锁。这里的 Write 记录就是历史上对该 key 进行写入或删除，或者该 key 上发生事务回滚的记录。Primary 锁被替换为何种 Write 记录标志着该事务提交成功与否。接下来，所有 Secondary 锁也会被依次替换。如果替换这些 Secondary 锁的线程死掉了，锁就残留了下来。
 
-    TiDB 100% 支持标准的 ACID 事务。
+Resolve Locks 这一步的任务即对 safe point 之前的锁进行回滚或提交，取决于其 Primary 是否被提交。如果一个 Primary 锁也残留了下来，那么该事务应当视为超时并进行回滚。这一步是必不可少的，因为如果其 Primary 的 Write 记录由于太老而被 GC 清除掉了，那么就再也无法知道该事务是否成功。如果该事务存在残留的 Secondary 锁，那么也无法知道它应当被回滚还是提交，也就无法保证一致性。
 
-- 真正金融级高可用
+Resolve Locks 的执行方式是由 GC leader 对所有的 Region 发送请求进行处理。从 3.0 起，这个过程默认会并行地执行，并发数量默认与 TiKV 节点个数相同。
 
-    相比于传统主从 (M-S) 复制方案，基于 Raft 的多数派选举协议可以提供金融级的 100% 数据强一致性保证，且在不丢失大多数副本的前提下，可以实现故障的自动恢复 (auto-failover)，无需人工介入。
+### Delete Ranges
 
-- 一站式 HTAP 解决方案
+在执行 `DROP TABLE/INDEX` 等操作时，会有大量连续的数据被删除。如果对每个 key 都进行删除操作、再对每个 key 进行 GC 的话，那么执行效率和空间回收速度都可能非常的低下。事实上，这种时候 TiDB 并不会对每个 key 进行删除操作，而是将这些待删除的区间及删除操作的时间戳记录下来。Delete Ranges 会将这些时间戳在 safe point 之前的区间进行快速的物理删除。
 
-    TiDB 作为典型的 OLTP 行存数据库，同时兼具强大的 OLAP 性能，配合 TiSpark，可提供一站式 HTAP 解决方案，一份存储同时处理 OLTP & OLAP，无需传统繁琐的 ETL 过程。
+### Do GC
 
-- 云原生 SQL 数据库
+这一步即删除所有 key 的过期版本。为了保证 safe point 之后的任何时间戳都具有一致的快照，这一步删除 safe point 之前提交的数据，但是会保留 safe point 前的最后一次写入（除非最后一次写入是删除）。
 
-    TiDB 是为云而设计的数据库，支持公有云、私有云和混合云，配合 [TiDB Operator 项目](/tidb-in-kubernetes/tidb-operator-overview.md) 可实现自动化运维，使部署、配置和维护变得十分简单。
+TiDB 2.1 及更早版本使用的 GC 方式是由 GC leader 向所有 Region 发送 GC 请求。从 3.0 起，GC leader 只需将 safe point 上传至 PD。每个 TiKV 节点都会各自从 PD 获取 safe point。当 TiKV 发现 safe point 发生更新时，便会对当前节点上所有作为 leader 的 Region 进行 GC。与此同时，GC leader 可以继续触发下一轮 GC。
 
-TiDB 的设计目标是 100% 的 OLTP 场景和 80% 的 OLAP 场景，更复杂的 OLAP 分析可以通过 [TiSpark 项目](/reference/tispark.md)来完成。
-
-TiDB 对业务没有任何侵入性，能优雅的替换传统的数据库中间件、数据库分库分表等 Sharding 方案。同时它也让开发运维人员不用关注数据库 Scale 的细节问题，专注于业务开发，极大的提升研发的生产力。
-
-三篇文章了解 TiDB 技术内幕：
-
-- [说存储](https://pingcap.com/blog-cn/tidb-internal-1/)
-- [说计算](https://pingcap.com/blog-cn/tidb-internal-2/)
-- [谈调度](https://pingcap.com/blog-cn/tidb-internal-3/)
-
-## 部署方式
-
-TiDB 可以部署在本地和云平台上，支持公有云、私有云和混合云。你可以根据实际场景或需求，选择相应的方式来部署 TiDB 集群：
-
-- [使用 Ansible 部署](/how-to/deploy/orchestrated/ansible.md)：如果用于生产环境，推荐使用 Ansible 部署 TiDB 集群。
-- [使用 Ansible 离线部署](/how-to/deploy/orchestrated/offline-ansible.md)：如果部署环境无法访问网络，可使用 Ansible 进行离线部署。
-- [使用 TiDB Operator 部署](/tidb-in-kubernetes/deploy/tidb-operator.md)：使用 TiDB Operator 在 Kubernetes 集群上部署生产就绪的 TiDB 集群，支持[部署到 AWS EKS](/tidb-in-kubernetes/deploy/aws-eks.md)、[部署到谷歌云 GKE (beta)](/tidb-in-kubernetes/deploy/gcp-gke.md)、[部署到阿里云 ACK](/tidb-in-kubernetes/deploy/alibaba-cloud.md) 等。
-- [使用 Docker Compose 部署](/how-to/get-started/deploy-tidb-from-docker-compose.md)：如果你只是想测试 TiDB、体验 TiDB 的特性，或者用于开发环境，可以使用 Docker Compose 在本地快速部署 TiDB 集群。该部署方式不适用于生产环境。
-- [使用 Docker 部署](/how-to/deploy/orchestrated/docker.md)：你可以使用 Docker 部署 TiDB 集群，但该部署方式不适用于生产环境。
-- [使用 TiDB Operator 部署到 Minikube](/tidb-in-kubernetes/get-started/deploy-tidb-from-kubernetes-minikube.md)：你可以使用 TiDB Opeartor 将 TiDB 集群部署到本地 Minikube 启动的 Kubernetes 集群中。该部署方式不适用于生产环境。
-- [使用 TiDB Operator 部署到 DinD](/tidb-in-kubernetes/get-started/deploy-tidb-from-kubernetes-dind.md)：你可以使用 TiDB Operator 将 TiDB 集群部署到本地以 DinD 方式启动的 Kubernetes 集群中。该部署方式不适用于生产环境。
-
-## 项目源码
-
-TiDB 集群所有组件的源码均可从 GitHub 上直接访问：
-
-- [TiDB](https://github.com/pingcap/tidb)
-- [TiKV](https://github.com/tikv/tikv)
-- [PD](https://github.com/pingcap/pd)
-- [TiSpark](https://github.com/pingcap/tispark)
-- [TiDB Operator](https://github.com/pingcap/tidb-operator)
+> **注意：**
+> 
+> 通过修改配置可以继续使用旧的 GC 方式，详情请参考 [GC 配置](/reference/garbage-collection/configuration.md)。
