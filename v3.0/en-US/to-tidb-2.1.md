@@ -14,8 +14,8 @@ aliases:
 - 新版本存储引擎更新，不支持在升级后回退至 2.0.x 或更旧版本
 - 从 2.0.6 之前的版本升级到 2.1 之前，需要确认集群中是否存在正在运行中的 DDL 操作，特别是耗时的 `Add Index` 操作，等 DDL 操作完成后再执行升级操作
 - 2.1 版本启用了并行 DDL，早于 2.0.1 版本的集群，无法滚动升级到 2.1，可以选择下面两种方案：
-    - 停机升级，直接从早于 2.0.1 的 TiDB 版本升级到 2.1
-    - 先滚动升级到 2.0.1 或者之后的 2.0.x 版本，再滚动升级到 2.1 版本
+    - Stop the cluster and upgrade to 2.1 directly
+    - Roll update to 2.0.1 or later 2.0.x versions, and then roll update to the 2.1 version
 
 ## 注意事项
 
