@@ -1,138 +1,156 @@
 ---
-title: Backup and Restore
+title: 备份与恢复
 category: how-to
 ---
 
-# Kubernetes 上的 TiDB 集群备份与恢复
+# 备份与恢复
 
-这篇文档详细描述了如何对 Kubernetes 上的 TiDB 集群进行数据备份和数据恢复。
+本文档将详细介绍如何对 TiDB 进行全量备份与恢复。增量备份与恢复可使用 [TiDB Binlog](/reference/tidb-binlog-overview.md)。
 
-Kubernetes 上的 TiDB 集群支持两种备份策略：
+这里我们假定 TiDB 服务信息如下：
 
-* [Full backup](#全量备份) (ad-hoc): use [`mydumper`](/reference/tools/mydumper.md)
-* [增量备份](#增量备份)：使用 [`TiDB Binlog`](/reference/tidb-binlog-overview.md) 将 TiDB 集群的数据实时复制到其它数据库中或实时获得增量数据备份；
+| Name | Address   | Port | User | Password |
+| ---- | --------- | ---- | ---- | -------- |
+| TiDB | 127.0.0.1 | 4000 | root | *        |
 
-目前，Kubernetes 上的 TiDB 集群只对 `mydumper` 获取的全量备份数据提供自动化的数据恢复操作。恢复 `TiDB-Binlog` 获取的增量数据需要手动进行。
+在这个备份恢复过程中，我们会用到下面的工具：
 
-## 全量备份
+- mydumper 从 TiDB 导出数据
+- loader 导入数据到 TiDB
 
-全量备份使用 `mydumper` 来获取 TiDB 集群的逻辑备份数据。全量备份任务会创建一个 PVC ([PersistentVolumeClaim](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistentvolumeclaims)) 来存储数据。
+## 下载 TiDB 工具集 (Linux)
 
-默认配置下，备份任务使用 PV ([Persistent Volume](https://kubernetes.io/docs/concepts/storage/persistent-volumes/#persistent-volumes)) 来存储备份数据。你也可以通过修改配置将备份数据存储到 [Google Cloud Storage](https://cloud.google.com/storage/)，[Ceph Object Storage](https://ceph.com/ceph-storage/object-storage/) 或 [Amazon S3](https://aws.amazon.com/s3/) 中，在这种情况下，数据在上传到对象存储前，会临时存储在 PV 中。参考 [Kubernetes 上的 TiDB 集群备份配置](/tidb-in-kubernetes/reference/configuration/backup.md) 了解所有的配置选项。
-
-你可以配置一个定时执行的全量备份任务，也可以临时执行一个全量备份任务。
-
-### 定时全量备份
-
-定时全量备份是一个与 TiDB 集群一同创建的定时任务，它会像 `crontab` 任务那样周期性地运行。
-
-你可以修改 TiDB 集群的 `values.yaml` 文件来配置定时全量备份：
-
-1. 将 `scheduledBackup.create` 设置为 `true`；
-2. 将 `scheduledBackup.storageClassName` 设置为用于存储数据的 PV 的 `storageClass`；
-
-    > **注意：**
-    > 
-    > 你必须将定时全量备份使用的 PV 的 [reclaim policy](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy) 设置为 `Retain` 来确保你的数据安全。
-
-3. 按照 [Cron](https://en.wikipedia.org/wiki/Cron) 格式设置 `scheduledBackup.schedule` 来定义任务的执行周期与时间；
-4. 创建一个包含数据库用户名和密码的 Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) 该用户必须拥有数据备份所需的数据库相关权限，同时，将 `scheduledBackup.secretName` 设置为该 `Secret` 的名字（默认为 `backup-secret`）：
-
-    {{< copyable "shell-regular" >}}
-
-    ```shell
-    kubectl create secret generic backup-secret -n <namespace> --from-literal=user=<user> --from-literal=password=<password>
-    ```
-
-5. 通过 `helm install` 创建一个配置了定时全量备份的 TiDB 集群，针对现有集群，则使用 `helm upgrade` 为集群打开定时全量备份：
-
-    {{< copyable "shell-regular" >}}
-
-    ```shell
-    helm upgrade <release_name> pingcap/tidb-cluster -f values.yaml --version=<tidb-operator-version>
-    ```
-
-### Ad-hoc 全量备份
-
-Ad-hoc 全量备份封装在 `pingcap/tidb-backup` 这个 Helm chart 中。根据 `values.yaml` 文件中的 `mode` 配置，该 chart 可以执行全量备份或数据恢复。我们会在[数据恢复](#数据恢复)一节中描述如何执行数据恢复。
-
-你可以通过下面的步骤执行一次 Ad-hoc 全量备份：
-
-1. 修改 `values.yaml`：
-    * 将 `clusterName` 设置为目标 TiDB 集群名字；
-    * 将 `mode` 设置为 `backup`；
-    * 将 `storage.className` 设置为用于存储数据的 PV 的 `storageClass`；
-    * 根据数据量调整 `storage.size`；
-
-    > **注意：**
-    > 
-    > 你必须将 Ad-hoc 全量备份使用的 PV 的 [reclaim policy](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy) 设置为 `Retain` 来确保你的数据安全。
-
-2. 创建一个包含数据库用户名和密码的 Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/)，该用户必须拥有数据备份所需的数据库相关权限，同时，将 `values.yaml` 中的 `secretName` 设置为该 `Secret` 的名字（默认为 `backup-secret`）：
-
-    {{< copyable "shell-regular" >}}
-
-    ```shell
-    kubectl create secret generic backup-secret -n <namespace> --from-literal=user=<user> --from-literal=password=<password>
-    ```
-
-3. 使用下面的命令执行一次 Ad-hoc 全量备份：
-
-    {{< copyable "shell-regular" >}}
-
-    ```shell
-    helm install pingcap/tidb-backup --name=<backup-name> --namespace=<namespace> -f values.yaml --version=<tidb-operator-version>
-    ```
-
-### 查看备份
-
-对于存储在 PV 中的备份，你可以使用下面的命令进行查看：
+下载 tool 压缩包：
 
 {{< copyable "shell-regular" >}}
 
-```shell
-kubectl get pvc -n <namespace> -l app.kubernetes.io/component=backup,pingcap.com/backup-cluster-name=<cluster-name>
+```bash
+wget http://download.pingcap.org/tidb-enterprise-tools-latest-linux-amd64.tar.gz && \
+wget http://download.pingcap.org/tidb-enterprise-tools-latest-linux-amd64.sha256
 ```
 
-假如你将数据存储在 [Google Cloud Storage](https://cloud.google.com/storage/)，[Ceph Object Storage](https://ceph.com/ceph-storage/object-storage/) 或 [Amazon S3](https://aws.amazon.com/s3/) 中，你可以用这些存储系统自带的图形界面或命令行工具查看全量备份。
+检查文件完整性，返回 ok 则正确：
 
-## 数据恢复
+{{< copyable "shell-regular" >}}
 
- 使用 `pingcap/tidb-backup` 这个 Helm chart 进行数据恢复，步骤如下：
+```bash
+sha256sum -c tidb-enterprise-tools-latest-linux-amd64.sha256
+```
 
-1. 修改 `values.yaml`：
-    * 将 `clusterName` 设置为目标 TiDB 集群名；
-    * 将 `mode` 设置为 `restore`；
-    * 将 `name`  设置为用于恢复的备份名字（你可以参考[查看备份](#查看备份)来寻找可用的备份数据）。假如备份数据存储在 [Google Cloud Storage](https://cloud.google.com/storage/)，[Ceph Object Storage](https://ceph.com/ceph-storage/object-storage/) 或 [Amazon S3](https://aws.amazon.com/s3/) 中，你必须保证这些存储的相关配置与执行[全量备份](#全量备份)时一致。
-2. 创建一个包含数据库用户名和密码的 Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/)，该用户必须拥有数据备份所需的数据库相关权限，同时，将 `values.yaml` 中的 `secretName` 设置为该 `Secret` 的名字（默认为 `backup-secret`，假如你在[全量备份](#全量备份)时已经创建了该 Secret，则可以跳过这步）：
+解开压缩包：
 
-    {{< copyable "shell-regular" >}}
+{{< copyable "shell-regular" >}}
 
-    ```shell
-    kubectl create secret generic backup-secret -n <namespace> --from-literal=user=<user> --from-literal=password=<password>
-    ```
+```bash
+tar -xzf tidb-enterprise-tools-latest-linux-amd64.tar.gz && \
+cd tidb-enterprise-tools-latest-linux-amd64
+```
 
-3. 恢复数据：
+## 使用 `mydumper`/`loader` 全量备份恢复数据
 
-    {{< copyable "shell-regular" >}}
+`mydumper` 是一个强大的数据备份工具，具体可以参考 [https://github.com/maxbube/mydumper](https://github.com/maxbube/mydumper)。
 
-    ```shell
-    helm install pingcap/tidb-backup --namespace=<namespace> --name=<restore-name> -f values.yaml --version=<tidb-operator-version>
-    ```
+可使用 [`mydumper`](/reference/tools/mydumper.md) 从 TiDB 导出数据进行备份，然后用 [`loader`](/reference/tools/loader.md) 将其导入到 TiDB 里面进行恢复。
 
-## 增量备份
+> **注意：**
+> 
+> 必须使用企业版工具集包的 `mydumper`，不要使用你的操作系统的包管理工具提供的 `mydumper`。`mydumper` 的上游版本并不能对 TiDB 进行正确处理 ([#155](https://github.com/maxbube/mydumper/pull/155))。由于使用 `mysqldump` 进行数据备份和恢复都要耗费许多时间，这里也并不推荐。
 
-增量备份使用 [TiDB Binlog](/reference/tidb-binlog-overview.md) 工具从 TiDB 集群收集 Binlog，并提供实时备份和向其它数据库的实时同步能力。
+### `mydumper`/`loader` 全量备份恢复最佳实践
 
-增量备份是默认关闭的，你可以通过修改 `values.yaml` 中的下列配置项来开启增量备份：
+为了快速的备份恢复数据 (特别是数据量巨大的库), 可以参考以下建议：
 
-* 将 `binlog.pump.create` 设置为 `true`；
-* 将 `binlog.drainer.create` 设置为 `true`；
-* 将 `binlog.pump.storageClassName` 和 `binlog.drainer.storageClassName` 设置为你的 Kubernetes 集群中可用的 `storageClass`；
-* 根据需求将 `binlog.drainer.destDBType` 设置为合适的下游存储，下面将详细叙述。
+* 使用 mydumper 导出来的数据文件尽可能的小, 最好不要超过 64M, 可以设置参数 -F 64
+* loader的 `-t` 参数可以根据 tikv 的实例个数以及负载进行评估调整，例如 3个 tikv 的场景， 此值可以设为 `3 *(1 ～ n)`；当 tikv 负载过高，loader 以及 tidb 日志中出现大量 `backoffer.maxSleep 15000ms is exceeded` 可以适当调小该值，当 tikv 负载不是太高的时候，可以适当调大该值。
 
-增量备份支持三种下游存储：
+数据恢复示例及相关的配置：
 
-* PV：默认的下游存储，这种情况下，你可以考虑为 `drainer` 配置更大的 PV 空间（通过修改 `binlog.drainer.storage` 配置）；
-* 兼容 MySQL 协议的数据库：通过设置 `binlog.drainer.destDBType` 为 `mysql` 来开启，你必须同时在 `binlog.drainer.mysql` 中配置目标数据库的地址和认证信息；
-* Apache Kafka：通过设置 `binlog.drainer.destDBType` 为 `kafka` 来开启，你必须同时在 `binlog.drainer.kafka` 中配置目标集群的 Zookeeper 地址和 Kafka 地址。
+- mydumper 导出后总数据量 214G，单表 8 列，20 亿行数据
+- 集群拓扑
+    - TIKV * 12
+    - TIDB * 4
+    - PD * 3
+- mydumper -F 设置为 16, loader -t 参数 64
+
+结果：导入时间 11 小时左右，19.4 G/小时
+
+## 从 TiDB 备份数据
+
+我们使用 `mydumper` 从 TiDB 备份数据，如下:
+
+{{< copyable "shell-regular" >}}
+
+```bash
+./bin/mydumper -h 127.0.0.1 -P 4000 -u root -t 16 -F 64 -B test -T t1,t2 --skip-tz-utc -o ./var/test
+```
+
+上面，我们使用 `-B test` 表明是对 `test` 这个 database 操作，然后用 `-T t1,t2` 表明只导出 `t1`，`t2` 两张表。
+
+`-t 16` 表明使用 16 个线程去导出数据。`-F 64` 是将实际的 table 切分成多大的 chunk，这里就是 64MB 一个 chunk。
+
+`--skip-tz-utc` 添加这个参数忽略掉 TiDB 与导数据的机器之间时区设置不一致的情况，禁止自动转换。
+
+## 向 TiDB 恢复数据
+
+我们使用 `loader` 将之前导出的数据导入到 TiDB，完成恢复操作。Loader 的下载和具体的使用方法见 [Loader 使用文档](/reference/tools/loader.md)
+
+{{< copyable "shell-regular" >}}
+
+```bash
+./bin/loader -h 127.0.0.1 -u root -P 4000 -t 32 -d ./var/test
+```
+
+导入成功之后，我们可以用 MySQL 官方客户端进入 TiDB，查看：
+
+{{< copyable "shell-regular" >}}
+
+```bash
+mysql -h127.0.0.1 -P4000 -uroot
+```
+
+{{< copyable "sql" >}}
+
+```sql
+show tables;
+```
+
+```
++----------------+
+| Tables_in_test |
++----------------+
+| t1             |
+| t2             |
++----------------+
+```
+
+{{< copyable "sql" >}}
+
+```sql
+select * from t1;
+```
+
+```
++----+------+
+| id | age  |
++----+------+
+|  1 |    1 |
+|  2 |    2 |
+|  3 |    3 |
++----+------+
+```
+
+{{< copyable "sql" >}}
+
+```sql
+select * from t2;
+```
+
+```
++----+------+
+| id | name |
++----+------+
+|  1 | a    |
+|  2 | b    |
+|  3 | c    |
++----+------+
+```
