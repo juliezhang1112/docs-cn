@@ -9,7 +9,7 @@ category: Releases
 
 ## TiDB
 
-- SQL 优化器
+- SQL Optimizer
     - 优化 `Index Join` 选择范围，提升执行性能
     - 优化关联子查询，下推 Filter 和扩大索引选择范围，部分查询的效率有数量级的提升
     - 在 `UPDATE`、`DELETE` 语句中支持 `Index Hint` 和 `Join Hint`
@@ -17,7 +17,7 @@ category: Releases
     - 支持更多函数下推：`ABS`/`CEIL`/`FLOOR`/`IS TRUE`/`IS FALSE`
     - 在常量折叠过程中特殊处理函数 `IF` 和 `IFNULL`
     - 优化 `EXPLAIN` 语句输出格式
-- SQL 执行引擎
+- SQL Execution Engine
     - 实现并行 `Hash Aggregate` 算子，部分场景下能提高 `Hash Aggregate` 计算性能 350%
     - 实现并行 `Project` 算子，部分场景下性能提升达 74%
     - 并发地读取 `Hash Join` 的 `Inner` 表和 `Outer` 表的数据，提升执行性能
@@ -31,7 +31,7 @@ category: Releases
     - 在 `general log` 和 `slow query log`  中添加 user 信息
     - 支持 Server side cursor
 - 兼容性
-    - 支持更多 MySQL 语法
+    - Support more MySQL syntaxes
     - `BIT` 聚合函数支持 `ALL` 参数
     - 支持 `SHOW PRIVILEGES` 语句
 - DML
@@ -60,8 +60,8 @@ category: Releases
 ## PD
 
 - PD 节点间开启 `Raft PreVote`，避免网络隔离后恢复时产生的重新选举
-- 优化 Balance Scheduler 频繁调度小 Region 的问题
-- 优化热点调度器，在流量统计信息抖动时适应性更好
+- Optimize the issue that Balance Scheduler schedules small Regions frequently
+- Optimize the hotspot scheduler to improve its adaptability when traffic statistics information jitters
 - `region merge` 调度时跳过数据行数较多的 Region
 - 默认开启 `raft learner` 功能，降低调度时出现宕机导致数据不可用的风险
 - `pd-recover` 移除 max-replica 参数
@@ -69,7 +69,7 @@ category: Releases
 - 修复 tikv-ctl unsafe recovery 之后 Region 信息没更新的问题
 - 修复某些场景下副本迁移导致 TiKV 磁盘空间耗尽的问题
 - 兼容性提示
-    - 由于新版本存储引擎更新，不支持在升级后回退至 2.0.x 或更旧版本
+    - TiDB 2.1 does not support downgrading to v2.0.x or earlier due to the adoption of the new storage engine
     - 新版本默认开启 `raft learner` 功能，如果从 1.x 版本集群升级至 2.1 版本，须停机升级或者先滚动升级 TiKV，完成后再滚动升级 PD
 
 ## TiKV
