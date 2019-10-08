@@ -1,66 +1,38 @@
 ---
-title: TiDB 简介
-category: introduction
+title: TiDB Lightning 简介
+category: reference
 ---
 
-# TiDB 简介
+# TiDB Lightning 简介
 
-TiDB 是 PingCAP 公司设计的开源分布式 HTAP (Hybrid Transactional and Analytical Processing) 数据库，结合了传统的 RDBMS 和 NoSQL 的最佳特性。TiDB 兼容 MySQL，支持无限的水平扩展，具备强一致性和高可用性。TiDB 的目标是为 OLTP (Online Transactional Processing) 和 OLAP (Online Analytical Processing) 场景提供一站式的解决方案。
+TiDB Lightning 是一个将全量数据高速导入到 TiDB 集群的工具，有以下两个主要的使用场景：一是大量新数据的快速导入；二是全量数据的备份恢复。目前，支持 mydumper 或 CSV 输出格式的数据源。您可以在以下两种场景下使用 Lightning：
 
-TiDB 具备如下特性：
+- **迅速**导入**大量新**数据。
+- 备份恢复所有数据。
 
-- 高度兼容 MySQL
+## TiDB Lightning 整体架构
 
-    [大多数情况下](/reference/mysql-compatibility.md)，无需修改代码即可从 MySQL 轻松迁移至 TiDB，分库分表后的 MySQL 集群亦可通过 TiDB 工具进行实时迁移。
+TiDB Lightning 主要包含两个部分:
 
-- 水平弹性扩展
+- **`tidb-lightning`**（“前端”）：主要完成适配工作，通过读取数据源，在下游 TiDB 集群建表、将数据转换成键/值对 (KV 对) 发送到 `tikv-importer`、检查数据完整性等。
+- **`tikv-importer`**（“后端”）：主要完成将数据导入 TiKV 集群的工作，把 `tidb-lightning` 写入的 KV 对缓存、排序、切分并导入到 TiKV 集群。
 
-    通过简单地增加新节点即可实现 TiDB 的水平扩展，按需扩展吞吐或存储，轻松应对高并发、海量数据场景。
+![TiDB Lightning 其整体架构](/media/tidb-lightning-architecture.png)
 
-- 分布式事务
+TiDB Lightning 整体工作原理如下：
 
-    TiDB 100% 支持标准的 ACID 事务。
+1. 在导数据之前，`tidb-lightning` 会自动将 TiKV 集群切换为“导入模式” (import mode)，优化写入效率并停止自动压缩 (compaction)。
 
-- 真正金融级高可用
+2. `tidb-lightning` 会在目标数据库建立架构和表，并获取其元数据。
 
-    相比于传统主从 (M-S) 复制方案，基于 Raft 的多数派选举协议可以提供金融级的 100% 数据强一致性保证，且在不丢失大多数副本的前提下，可以实现故障的自动恢复 (auto-failover)，无需人工介入。
+3. 每张表都会被分割为多个连续的*区块*，这样来自大表（200 GB+）的数据就可以用增量方式导入。
 
-- 一站式 HTAP 解决方案
+4. `tidb-lightning` 会通过 gRPC 让 `tikv-importer` 为每一个区块准备一个“引擎文件 (engine file)”来处理 KV 对。`tidb-lightning` 会并发读取 SQL dump，将数据源转换成与 TiDB 相同编码的 KV 对，然后发送到 `tikv-importer` 里对应的引擎文件。
 
-    TiDB 作为典型的 OLTP 行存数据库，同时兼具强大的 OLAP 性能，配合 TiSpark，可提供一站式 HTAP 解决方案，一份存储同时处理 OLTP & OLAP，无需传统繁琐的 ETL 过程。
+5. 当一个引擎文件数据写入完毕时，`tikv-importer` 便开始对目标 TiKV 集群数据进行分裂和调度，然后导入数据到 TiKV 集群。
 
-- 云原生 SQL 数据库
+   引擎文件包含两种：*数据引擎*与*索引引擎*，各自又对应两种 KV 对：行数据和次级索引。通常行数据在数据源里是完全有序的，而次级索引是无序的。因此，数据引擎文件在对应区块写入完成后会被立即上传，而所有的索引引擎文件只有在整张表所有区块编码完成后才会执行导入。
 
-    TiDB 是为云而设计的数据库，支持公有云、私有云和混合云，配合 [TiDB Operator 项目](/tidb-in-kubernetes/tidb-operator-overview.md) 可实现自动化运维，使部署、配置和维护变得十分简单。
+6. 整张表相关联的所有引擎文件完成导入后，`tidb-lightning` 会对比本地数据源及下游集群的校验和 (checksum)，确保导入的数据无损，以及让 TiDB 分析 (`ANALYZE`) 这些新增的数据，以优化日后的操作。
 
-TiDB 的设计目标是 100% 的 OLTP 场景和 80% 的 OLAP 场景，更复杂的 OLAP 分析可以通过 [TiSpark 项目](/reference/tispark.md)来完成。
-
-TiDB 对业务没有任何侵入性，能优雅的替换传统的数据库中间件、数据库分库分表等 Sharding 方案。同时它也让开发运维人员不用关注数据库 Scale 的细节问题，专注于业务开发，极大的提升研发的生产力。
-
-三篇文章了解 TiDB 技术内幕：
-
-- [说存储](https://pingcap.com/blog-cn/tidb-internal-1/)
-- [说计算](https://pingcap.com/blog-cn/tidb-internal-2/)
-- [谈调度](https://pingcap.com/blog-cn/tidb-internal-3/)
-
-## 部署方式
-
-TiDB 可以部署在本地和云平台上，支持公有云、私有云和混合云。你可以根据实际场景或需求，选择相应的方式来部署 TiDB 集群：
-
-- [使用 Ansible 部署](/how-to/deploy/orchestrated/ansible.md)：如果用于生产环境，推荐使用 Ansible 部署 TiDB 集群。
-- [使用 Ansible 离线部署](/how-to/deploy/orchestrated/offline-ansible.md)：如果部署环境无法访问网络，可使用 Ansible 进行离线部署。
-- [使用 TiDB Operator 部署](/tidb-in-kubernetes/deploy/tidb-operator.md)：使用 TiDB Operator 在 Kubernetes 集群上部署生产就绪的 TiDB 集群，支持[部署到 AWS EKS](/tidb-in-kubernetes/deploy/aws-eks.md)、[部署到谷歌云 GKE (beta)](/tidb-in-kubernetes/deploy/gcp-gke.md)、[部署到阿里云 ACK](/tidb-in-kubernetes/deploy/alibaba-cloud.md) 等。
-- [使用 Docker Compose 部署](/how-to/get-started/deploy-tidb-from-docker-compose.md)：如果你只是想测试 TiDB、体验 TiDB 的特性，或者用于开发环境，可以使用 Docker Compose 在本地快速部署 TiDB 集群。该部署方式不适用于生产环境。
-- [使用 Docker 部署](/how-to/deploy/orchestrated/docker.md)：你可以使用 Docker 部署 TiDB 集群，但该部署方式不适用于生产环境。
-- [使用 TiDB Operator 部署到 Minikube](/tidb-in-kubernetes/get-started/deploy-tidb-from-kubernetes-minikube.md)：你可以使用 TiDB Opeartor 将 TiDB 集群部署到本地 Minikube 启动的 Kubernetes 集群中。该部署方式不适用于生产环境。
-- [使用 TiDB Operator 部署到 DinD](/tidb-in-kubernetes/get-started/deploy-tidb-from-kubernetes-dind.md)：你可以使用 TiDB Operator 将 TiDB 集群部署到本地以 DinD 方式启动的 Kubernetes 集群中。该部署方式不适用于生产环境。
-
-## 项目源码
-
-TiDB 集群所有组件的源码均可从 GitHub 上直接访问：
-
-- [TiDB](https://github.com/pingcap/tidb)
-- [TiKV](https://github.com/tikv/tikv)
-- [PD](https://github.com/pingcap/pd)
-- [TiSpark](https://github.com/pingcap/tispark)
-- [TiDB Operator](https://github.com/pingcap/tidb-operator)
+7. 在所有步骤完毕后，`tidb-lightning` 自动将 TiKV 切换回“普通模式” (normal mode)，此后 TiDB 集群可以正常对外提供服务。
