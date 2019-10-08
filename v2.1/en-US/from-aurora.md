@@ -1,12 +1,12 @@
 ---
-title: 从 Amazon Aurora MySQL 迁移数据
-summary: 使用 DM 从 Amazon Aurora MySQL 迁移数据。
-category: how-to
+title: 从 AWS Aurora MySQL 迁移数据
+summary: 使用 DM 从 AWS Aurora MySQL 迁移数据。
+category: reference
 ---
 
-# 从 Amazon Aurora MySQL 迁移数据
+# 从 AWS Aurora MySQL 迁移数据
 
-本文介绍如何使用 DM 从 [Amazon Aurora MySQL](https://aws.amazon.com/cn/rds/aurora/details/mysql-details/) 迁移数据到 TiDB。
+本文介绍如何使用 DM 从 [AWS Aurora MySQL](https://aws.amazon.com/cn/rds/aurora/details/mysql-details/) 迁移数据到 TiDB。
 
 ## 第 1 步：在 Aurora 集群中启用 binlog
 
@@ -171,7 +171,6 @@ mydumpers:
         ```
 
         此时可以选择以下两种处理方法中的任意一种进行处理后，再使用 `start-task` 尝试重新启动任务：
-
         1. 为用于进行数据迁移的 Aurora 用户移除不被 TiDB 支持的不必要的权限
         2. 如果能确保 Aurora 用户拥有 DM 所需要的权限，可以在 `task.yaml` 配置文件中添加如下顶级配置项以跳过启用任务时的前置权限检查
 
@@ -197,5 +196,5 @@ query-status
 > 此时如果能接受不使用 FTWL 来确保 dump 文件与 metadata 的一致或上游能暂时停止写入，可以通过为 `mydumpers` 下的 `extra-args` 添加 `--no-locks` 参数来进行绕过，具体方法为：
 > 
 > 1. 使用 `stop-task` 停止当前由于不能正常 dump 而已经转为 paused 的任务
-> 2. 将原 `task.yaml` 中的 `extra-args: "-B test_db -T test_table"` 更新为 `extra-args: "-B test_db -T test_table --no-locks"`
+> 2. 将原 task.yaml 中的 `extra-args: "-B test_db -T test_table"` 更新为 `extra-args: "-B test_db -T test_table --no-locks"`
 > 3. 使用 `start-task` 重新启动任务
