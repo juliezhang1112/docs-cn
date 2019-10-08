@@ -23,7 +23,7 @@ category: Roadmap
     - [ ] Vectorized 表达式计算
     - [ ] UDF
 - [ ] SQL 功能
-    - [ ] Support Views
+    - [ ] 支持 View
     - [ ] 支持窗口函数
     - [ ] 支持 Common Table Expression
     - [ ] 支持 Hash 分区表
