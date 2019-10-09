@@ -1,15 +1,15 @@
 ---
-title: Kubernetes 上的 TiDB 集群备份恢复
+title: Backup and Restore
 category: how-to
 ---
 
-# Kubernetes 上的 TiDB 集群备份与恢复
+# Backup and Restore
 
-这篇文档详细描述了如何对 Kubernetes 上的 TiDB 集群进行数据备份和数据恢复。
+This document describes how to back up and restore the data of a TiDB cluster in Kubernetes.
 
-Kubernetes 上的 TiDB 集群支持两种备份策略：
+TiDB in Kubernetes supports two kinds of backup strategies:
 
-* [全量备份](#全量备份)（定时执行或 Ad-hoc）：使用 [`mydumper`](/reference/tools/mydumper.md) 获取集群的逻辑备份；
+* [Full backup](#full backup)（scheduled or ad-hoc）：use [`mydumper`](/reference/tools/mydumper.md) to take a logical backup of the TiDB cluster.
 * [增量备份](#增量备份)：使用 [`TiDB Binlog`](/reference/tidb-binlog-overview.md) 将 TiDB 集群的数据实时复制到其它数据库中或实时获得增量数据备份；
 
 目前，Kubernetes 上的 TiDB 集群只对 `mydumper` 获取的全量备份数据提供自动化的数据恢复操作。恢复 `TiDB-Binlog` 获取的增量数据需要手动进行。
@@ -28,7 +28,7 @@ Kubernetes 上的 TiDB 集群支持两种备份策略：
 
 你可以修改 TiDB 集群的 `values.yaml` 文件来配置定时全量备份：
 
-1. 将 `scheduledBackup.create` 设置为 `true`；
+1. Set `scheduledBackup.create` to `true`；
 2. 将 `scheduledBackup.storageClassName` 设置为用于存储数据的 PV 的 `storageClass`；
 
     > **注意：**
