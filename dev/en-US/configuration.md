@@ -1,90 +1,119 @@
 ---
-title: GC 配置
+title: PD 配置参数
 category: reference
 ---
 
-# GC 配置
+# PD 配置参数
 
-TiDB 的 GC 相关的配置存储于 `mysql.tidb` 系统表中，可以通过 SQL 语句对这些参数进行查询和更改：
+PD 可以通过命令行参数或环境变量配置。
 
-```plain
-mysql> select VARIABLE_NAME, VARIABLE_VALUE from mysql.tidb;
-+--------------------------+----------------------------------------------------------------------------------------------------+
-| VARIABLE_NAME            | VARIABLE_VALUE                                                                                     |
-+--------------------------+----------------------------------------------------------------------------------------------------+
-| bootstrapped             | True                                                                                               |
-| tidb_server_version      | 33                                                                                                 |
-| system_tz                | UTC                                                                                                |
-| tikv_gc_leader_uuid      | 5afd54a0ea40005                                                                                    |
-| tikv_gc_leader_desc      | host:tidb-cluster-tidb-0, pid:215, start at 2019-07-15 11:09:14.029668932 +0000 UTC m=+0.463731223 |
-| tikv_gc_leader_lease     | 20190715-12:12:14 +0000                                                                            |
-| tikv_gc_enable           | true                                                                                               |
-| tikv_gc_run_interval     | 10m0s                                                                                              |
-| tikv_gc_life_time        | 10m0s                                                                                              |
-| tikv_gc_last_run_time    | 20190715-12:09:14 +0000                                                                            |
-| tikv_gc_safe_point       | 20190715-11:59:14 +0000                                                                            |
-| tikv_gc_auto_concurrency | true                                                                                               |
-| tikv_gc_mode             | distributed                                                                                        |
-+--------------------------+----------------------------------------------------------------------------------------------------+
-13 rows in set (0.00 sec)
-```
+## `--advertise-client-urls`
 
-例如，如果需要将 GC 调整为保留最近一天以内的数据，只需执行下列语句即可：
++ 对外客户端访问 URL 列表。
++ 默认：`${client-urls}`
++ 在某些情况下，譬如 docker，或者 NAT 网络环境，客户端并不能通过 PD 自己监听的 client URLs 来访问到 PD，这时候，你就可以设置 advertise urls 来让客户端访问
++ 例如，docker 内部 IP 地址为 172.17.0.1，而宿主机的 IP 地址为 192.168.100.113 并且设置了端口映射 `-p 2379:2379`，那么可以设置为 `--advertise-client-urls="http://192.168.100.113:2379"`，客户端可以通过 `http://192.168.100.113:2379` 来找到这个服务。
 
-```sql
-update mysql.tidb set VARIABLE_VALUE="24h" where VARIABLE_NAME="tikv_gc_life_time";
-```
+## `--advertise-peer-urls`
 
-> **注意：**
-> 
-> `mysql.tidb` 系统表中除了下文将要列出的 GC 的配置以外，还包含一些 TiDB 用于储存部分集群状态（包括 GC 状态）的记录。请勿手动更改这些记录。其中，与 GC 有关的记录如下：
-> 
-> - `tikv_gc_leader_uuid`，`tikv_gc_leader_desc` 和 `tikv_gc_leader_lease` 用于记录 GC leader 的状态
-> - `tikv_gc_last_run_time`：上次 GC 运行时间
-> - `tikv_gc_safe_point`：当前 GC 的 safe point
++ 对外其他 PD 节点访问 URL 列表。
++ 默认：`${peer-urls}`
++ 在某些情况下，譬如 docker，或者 NAT 网络环境，其他节点并不能通过 PD 自己监听的 peer URLs 来访问到 PD，这时候，你就可以设置 advertise urls 来让其他节点访问
++ 例如，docker 内部 IP 地址为 172.17.0.1，而宿主机的 IP 地址为 192.168.100.113 并且设置了端口映射 `-p 2380:2380`，那么可以设置为 `--advertise-peer-urls="http://192.168.100.113:2380"`，其他 PD 节点可以通过 `http://192.168.100.113:2380` 来找到这个服务。
 
-## `tikv_gc_enable`
+## `--client-urls`
 
-- 控制是否启用 GC。
-- 默认值：`true`
++ 处理客户端请求监听 URL 列表。
++ 默认：`http://127.0.0.1:2379`
++ 如果部署一个集群，\-\-client-urls 必须指定当前主机的 IP 地址，例如 `http://192.168.100.113:2379"`，如果是运行在 docker 则需要指定为 `http://0.0.0.0:2379`。
 
-## `tikv_gc_run_interval`
+## `--peer-urls`
 
-- 指定 GC 运行时间间隔。Duration 类型，使用 Go 的 Duration 字符串格式，如 `"1h30m"`，`"15m"` 等。
-- 默认值：`"10m0s"`
++ 处理其他 PD 节点请求监听 URL 列表。
++ default: `http://127.0.0.1:2380`
++ 如果部署一个集群，\-\-peer-urls 必须指定当前主机的 IP 地址，例如 `http://192.168.100.113:2380`，如果是运行在 docker 则需要指定为 `http://0.0.0.0:2380`。
 
-## `tikv_gc_life_time`
+## `--config`
 
-- 每次 GC 时，保留数据的时限。Duration 类型。每次 GC 时将以当前时间减去该配置的值作为 safe point。
-- 默认值：`"10m0s"`
++ 配置文件。
++ 默认：""
++ 如果你指定了配置文件，PD 会首先读取配置文件的配置。然后如果对应的配置在命令行参数里面也存在，PD 就会使用命令行参数的配置来覆盖配置文件里面的。
 
-> **注意：**
-> 
-> - `tikv_gc_life_time` 的值必须大于 TiDB 的配置文件中的 [`max-txn-time-use`](/reference/configuration/tidb-server/configuration-file.md#max-txn-time-use) 的值至少 10 秒，且不低于 10 分钟。
-> 
-> - 在数据更新频繁的场景下，如果将 `tikv_gc_life_time` 设置得比较大（如数天甚至数月），可能会有一些潜在的问题，如：
->     
->     - 磁盘空间占用较多。
->     - 大量的历史版本会在一定程度上影响性能，尤其是范围查询（如 `select count(*) from t`）。
+## `--data-dir`
 
-## `tikv_gc_mode`
++ PD 存储数据路径。
++ 默认：`default.${name}`
 
-指定 GC 模式。可选值如下：
+## `--initial-cluster`
 
-- `"distributed"`（默认）：分布式 GC 模式。在此模式下，[Do GC](/reference/garbage-collection/overview.md#do-gc) 阶段由 TiDB 上的 GC leader 向 PD 发送 safe point，每个 TiKV 节点各自获取该 safe point 并对所有当前节点上作为 leader 的 Region 进行 GC。此模式于 TiDB 3.0 引入。
++ 初始化 PD 集群配置。
++ 默认：`"{name}=http://{advertise-peer-url}"`
++ 例如，如果 name 是 "pd", 并且 `advertise-peer-urls` 是 `http://192.168.100.113:2380`, 那么 `initial-cluster` 就是 `pd=http://192.168.100.113:2380`。
++ 如果你需要启动三台 PD，那么 `initial-cluster` 可能就是 `pd1=http://192.168.100.113:2380, pd2=http://192.168.100.114:2380, pd3=192.168.100.115:2380`。
 
-- `"central"`：集中 GC 模式。在此模式下，[Do GC](/reference/garbage-collection/overview.md#do-gc) 阶段由 GC leader 向所有的 Region 发送 GC 请求。TiDB 2.1 及更早版本采用此 GC 模式。
+## `--join`
 
-## `tikv_gc_auto_concurrency`
++ 动态加入 PD 集群。
++ 默认：""
++ 如果你想动态将一台 PD 加入集群，你可以使用 `--join="${advertise-client-urls}"`， `advertise-client-url` 是当前集群里面任意 PD 的 `advertise-client-url`，你也可以使用多个 PD 的，需要用逗号分隔。
 
-控制是否由 TiDB 自动决定 GC concurrency，即同时进行 GC 的线程数。
+## `-L`
 
-当 `tikv_gc_mode` 设为 `"distributed"`，GC concurrency 将应用于 [Resolve Locks](/reference/garbage-collection/overview.md#resolve-locks) 阶段。当 [`tikv_gc_mode`](#tikv_gc_mode) 设为 `"central"` 时，GC concurrency 将应用于 Resolve Locks 以及 [Do GC](/reference/garbage-collection/overview.md#do-gc) 两个阶段。
++ Log 级别。
++ 默认："info"
++ 我们能选择 debug, info, warn, error 或者 fatal。
 
-- `true`（默认）：自动以 TiKV 节点的个数作为 GC concurrency
-- `false`：使用 [`tikv_gc_concurrency`](#tikv-gc-concurrency) 的值作为 GC 并发数
+## `--log-file`
 
-## `tikv_gc_concurrency`
++ Log 文件。
++ 默认：""
++ 如果没设置这个参数，log 会默认输出到 "stderr"，如果设置了，log 就会输出到对应的文件里面，在每天凌晨，log 会自动轮转使用一个新的文件，并且将以前的文件改名备份。
 
-- 手动设置 GC concurrency。要使用该参数，必须将 [`tikv_gc_auto_concurrency`](#tikv-gc-auto-concurrency) 设为 `false` 。
-- 默认值：2
+## `--log-rotate`
+
++ 是否开启日志切割。
++ 默认：true
++ 当值为 true 时,按照 PD 配置文件中 `[log.file]` 信息执行。
+
+## `--name`
+
++ 当前 PD 的名字。
++ 默认："pd"
++ 如果你需要启动多个 PD，一定要给 PD 使用不同的名字
+
+## `--cacert`
+
++ CA 文件路径，用于开启 TLS。
++ 默认：""
+
+## `--cert`
+
++ 包含 X509 证书的 PEM 文件路径，用户开启 TLS。
++ 默认：""
+
+## `--key`
+
++ 包含 X509 key 的 PEM 文件路径，用于开启 TLS。
++ 默认：""
+
+## `--namespace-classifier`
+
++ 指定 PD 使用的 namespace 分类器。
++ 默认："table"
++ 如果 TiKV 不与 TiDB 集群配合运行，建议配置为 'default'。
+
+## `--metrics-addr`
+
++ 指定 Prometheus Pushgateway 的地址。
++ 默认：""
++ 如果留空，则不开启 Prometheus Push。
+
+## `--force-new-cluster`
+
++ 强制使用当前节点创建新的集群。
++ 默认：false
++ 仅用于在 PD 丢失多数副本的情况下恢复服务，可能会产生部分数据丢失。
+
+## `-V`, `--version`
+
++ 输出版本信息并退出。
