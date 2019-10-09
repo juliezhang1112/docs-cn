@@ -9,7 +9,7 @@ This document describes how to back up and restore the data of a TiDB cluster in
 
 TiDB in Kubernetes supports two kinds of backup strategies:
 
-* [Full backup](#full backup)（scheduled or ad-hoc）：use [`mydumper`](/reference/tools/mydumper.md) to take a logical backup of the TiDB cluster.
+* [Full backup](#full backup)(scheduled or ad-hoc): use [`mydumper`](/reference/tools/mydumper.md) to take a logical backup of the TiDB cluster.
 * [增量备份](#增量备份)：使用 [`TiDB Binlog`](/reference/tidb-binlog-overview.md) 将 TiDB 集群的数据实时复制到其它数据库中或实时获得增量数据备份；
 
 目前，Kubernetes 上的 TiDB 集群只对 `mydumper` 获取的全量备份数据提供自动化的数据恢复操作。恢复 `TiDB-Binlog` 获取的增量数据需要手动进行。
@@ -29,7 +29,7 @@ TiDB in Kubernetes supports two kinds of backup strategies:
 你可以修改 TiDB 集群的 `values.yaml` 文件来配置定时全量备份：
 
 1. Set `scheduledBackup.create` to `true`；
-2. 将 `scheduledBackup.storageClassName` 设置为用于存储数据的 PV 的 `storageClass`；
+2. Set `scheduledBackup.storageClassName` to the `storageClass` of the PV that stores the backup data;
 
     > **注意：**
     > 
