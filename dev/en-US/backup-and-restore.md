@@ -3,14 +3,14 @@ title: Backup and Restore
 category: how-to
 ---
 
-# Kubernetes 上的 TiDB 集群备份与恢复
+# Backup and Restore
 
-这篇文档详细描述了如何对 Kubernetes 上的 TiDB 集群进行数据备份和数据恢复。
+This document describes how to back up and restore the data of a TiDB cluster in Kubernetes.
 
-Kubernetes 上的 TiDB 集群支持两种备份策略：
+TiDB in Kubernetes supports two kinds of backup strategies:
 
-* [Full backup](#全量备份) (ad-hoc): use [`mydumper`](/reference/tools/mydumper.md)
-* [增量备份](#增量备份)：使用 [`TiDB Binlog`](/reference/tidb-binlog-overview.md) 将 TiDB 集群的数据实时复制到其它数据库中或实时获得增量数据备份；
+* [Full backup](#full backup) (scheduled or ad-hoc): use [`mydumper`](/reference/tools/mydumper.md) to take a logical backup of the TiDB cluster.
+* [Incremental backup](#incremental backup): use [`TiDB Binlog`](/reference/tidb-binlog-overview.md) to replicate data in the TiDB cluster to another database or take a real-time backup of the data.
 
 目前，Kubernetes 上的 TiDB 集群只对 `mydumper` 获取的全量备份数据提供自动化的数据恢复操作。恢复 `TiDB-Binlog` 获取的增量数据需要手动进行。
 
@@ -31,9 +31,9 @@ Kubernetes 上的 TiDB 集群支持两种备份策略：
 1. 将 `scheduledBackup.create` 设置为 `true`；
 2. 将 `scheduledBackup.storageClassName` 设置为用于存储数据的 PV 的 `storageClass`；
 
-    > **注意：**
+    > **Note:**
     > 
-    > 你必须将定时全量备份使用的 PV 的 [reclaim policy](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy) 设置为 `Retain` 来确保你的数据安全。
+    > You must set the scheduled full backup PV's [reclaim policy](https://kubernetes.io/docs/tasks/administer-cluster/change-pv-reclaim-policy) to `Retain` to keep your backup data safe.
 
 3. 按照 [Cron](https://en.wikipedia.org/wiki/Cron) 格式设置 `scheduledBackup.schedule` 来定义任务的执行周期与时间；
 4. 创建一个包含数据库用户名和密码的 Kubernetes [Secret](https://kubernetes.io/docs/concepts/configuration/secret/) 该用户必须拥有数据备份所需的数据库相关权限，同时，将 `scheduledBackup.secretName` 设置为该 `Secret` 的名字（默认为 `backup-secret`）：
