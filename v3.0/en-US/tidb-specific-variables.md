@@ -215,7 +215,7 @@ set @@global.tidb_distsql_scan_concurrency = 10
 
 这个变量用来设置自动切分插入/待删除数据的的 batch 大小。仅在 tidb_batch_insert 或 tidb_batch_delete 开启时有效。
 
-> **注意：**
+> **Note:**
 > 
 > 当单行总数据大小很大时，20k 行总数据量数据会超过单个事务大小限制。因此在这种情况下，用户应当将其设置为一个较小的值。
 
