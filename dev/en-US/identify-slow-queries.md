@@ -32,7 +32,7 @@ insert into t select * from t;
 
 ## 字段含义说明
 
-> **注意：**
+> **Note:**
 > 
 > 慢查询日志中所有时间相关字段的单位都是 **“秒”**
 
@@ -78,7 +78,7 @@ Slow Query 基础信息：
 
 用户可通过查询 `INFORMATION_SCHEMA.SLOW_QUERY` 表来查询慢查询日志中的内容，表中列名和慢日志中字段名一一对应，表结构可查看 [Information Schema](reference/system-databases/information-schema.md#information-schema) 中关于 `SLOW_QUERY` 表的介绍。
 
-> **注意：**
+> **Note:**
 > 
 > 每次查询 `SLOW_QUERY` 表时，TiDB 都会去读取和解析一次当前的慢查询日志。
 
@@ -220,7 +220,7 @@ set tidb_slow_query_file = "/path-to-log/tidb-slow.log"
 
 可以用 `pt-query-digest` 工具分析 TiDB 慢日志。
 
-> **注意：**
+> **Note:**
 > 
 > 建议使用 pt-query-digest 3.0.13 及以上版本。
 
