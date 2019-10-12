@@ -1,42 +1,42 @@
 ---
-title: TiDB-Ansible 部署方案
+title: 使用 TiDB Ansible 部署 TiDB 集群
 category: how-to
 ---
 
-# TiDB-Ansible 部署方案
+# 使用 TiDB Ansible 部署 TiDB 集群
 
 ## 概述
 
-Ansible 是一款自动化运维工具，[TiDB-Ansible](https://github.com/pingcap/tidb-ansible) 是 PingCAP 基于 Ansible playbook 功能编写的集群部署工具。本文档介绍如何使用 TiDB-Ansible 部署一个完整的 TiDB 集群。
+Ansible 是一款自动化运维工具，[TiDB Ansible](https://github.com/pingcap/tidb-ansible) 是 PingCAP 基于 Ansible playbook 功能编写的集群部署工具。本文档介绍如何使用 TiDB Ansible 部署一个完整的 TiDB 集群。
 
 本部署工具可以通过配置文件设置集群拓扑，完成以下各项运维工作：
 
 - 初始化操作系统参数
 - 部署 TiDB 集群（包括 PD、TiDB、TiKV 等组件和监控组件）
-- [启动集群](/how-to/maintain/ansible-operations.md#启动集群)
-- [关闭集群](/how-to/maintain/ansible-operations.md#关闭集群)
-- [变更组件配置](/how-to/upgrade/rolling-updates-with-ansible.md#变更组件配置)
-- [集群扩容缩容](/how-to/scale/with-ansible.md)
-- [升级组件版本](/how-to/upgrade/rolling-updates-with-ansible.md#升级组件版本)
-- [集群开启 binlog](/reference/tidb-binlog-overview.md)
-- [清除集群数据](/how-to/maintain/ansible-operations.md#清除集群数据)
-- [销毁集群](/how-to/maintain/ansible-operations.md#销毁集群)
+- [启动集群](/v2.1/how-to/maintain/ansible-operations.md#启动集群)
+- [关闭集群](/v2.1/how-to/maintain/ansible-operations.md#关闭集群)
+- [变更组件配置](/v2.1/how-to/upgrade/rolling-updates-with-ansible.md#变更组件配置)
+- [集群扩容缩容](/v2.1/how-to/scale/with-ansible.md)
+- [升级组件版本](/v2.1/how-to/upgrade/rolling-updates-with-ansible.md#升级组件版本)
+- [集群开启 binlog](/v2.1/reference/tidb-binlog-overview.md)
+- [清除集群数据](/v2.1/how-to/maintain/ansible-operations.md#清除集群数据)
+- [销毁集群](/v2.1/how-to/maintain/ansible-operations.md#销毁集群)
 
-> **注意：**
+> **Note:**
 > 
-> 对于生产环境，须使用 TiDB-Ansible 部署 TiDB 集群。如果只是用于测试 TiDB 或体验 TiDB 的特性，建议[使用 Docker Compose 在单机上快速部署 TiDB 集群](/how-to/get-started/local-cluster/install-from-docker-compose.md)。
+> 对于生产环境，须使用 TiDB Ansible 部署 TiDB 集群。如果只是用于测试 TiDB 或体验 TiDB 的特性，建议[使用 Docker Compose 在单机上快速部署 TiDB 集群](/v2.1/how-to/get-started/local-cluster/install-from-docker-compose.md)。
 
 ## 准备机器
 
 1. 部署目标机器若干
 
-    - 建议 4 台及以上，TiKV 至少 3 实例，且与 TiDB、PD 模块不位于同一主机，详见[部署建议](/how-to/deploy/hardware-recommendations.md)。
+    - 建议 4 台及以上，TiKV 至少 3 实例，且与 TiDB、PD 模块不位于同一主机，详见[部署建议](/v2.1/how-to/deploy/hardware-recommendations.md)。
     - 推荐安装 CentOS 7.3 及以上版本 Linux 操作系统，x86_64 架构 (amd64)。
     - 机器之间内网互通。
 
-    > **注意：**
+    > **Note:**
     > 
-    > 使用 Ansible 方式部署时，TiKV 及 PD 节点数据目录所在磁盘请使用 SSD 磁盘，否则无法通过检测。** 如果仅验证功能，建议使用 [Docker Compose 部署方案](/how-to/get-started/local-cluster/install-from-docker-compose.md)单机进行测试。
+    > 使用 Ansible 方式部署时，TiKV 及 PD 节点数据目录所在磁盘请使用 SSD 磁盘，否则无法通过检测。** 如果仅验证功能，建议使用 [Docker Compose 部署方案](/v2.1/how-to/get-started/local-cluster/install-from-docker-compose.md)单机进行测试。
 
 2. 部署中控机一台:
 
@@ -117,7 +117,7 @@ The key's randomart image is:
 +----[SHA256]-----+
 ```
 
-## 在中控机器上下载 TiDB-Ansible
+## 在中控机器上下载 TiDB Ansible
 
 以 `tidb` 用户登录中控机并进入 `/home/tidb` 目录。以下为 tidb-ansible 与 TiDB 的版本对应关系，版本选择可以咨询官方。
 
@@ -126,13 +126,13 @@ The key's randomart image is:
 | 2.0 版本  | v2.0.10、v2.0.11    | 2.0 稳定版本，新用户不建议用于生产环境 |
 | 2.1 版本  | v2.1.1 ~ v2.1.13 等 | 2.1 稳定版本，可用于生产环境      |
 
-使用以下命令从 [TiDB-Ansible 项目](https://github.com/pingcap/tidb-ansible)上下载 TiDB-Ansible 2.0 或者 2.1 [相应 TAG 版本](https://github.com/pingcap/tidb-ansible/tags)，默认的文件夹名称为 `tidb-ansible`。
+使用以下命令从 [TiDB Ansible 项目](https://github.com/pingcap/tidb-ansible)上下载 TiDB Ansible 2.0 或者 2.1 [相应 TAG 版本](https://github.com/pingcap/tidb-ansible/tags)，默认的文件夹名称为 `tidb-ansible`。
 
 ```
 $ git clone -b $tag https://github.com/pingcap/tidb-ansible.git
 ```
 
-> **注意：**
+> **Note:**
 > 
 > - `$tag` 替换为选定的 TAG 版本的值，例如 `v2.1.15`。
 > - 部署和升级 TiDB 集群需使用对应的 tidb-ansible 版本，通过改 `inventory.ini` 文件中的版本来混用可能会产生一些错误。
@@ -305,7 +305,7 @@ UUID=c51eb23b-195c-4061-92a9-3fad812cc12f /data1 ext4 defaults,nodelalloc,noatim
 
 以 `tidb` 用户登录中控机，`inventory.ini` 文件路径为 `/home/tidb/tidb-ansible/inventory.ini`。
 
-> **注意：**
+> **Note:**
 > 
 > 请使用内网 IP 来部署集群，如果部署目标机器 SSH 端口非默认 22 端口，需添加 `ansible_port` 变量，如 `TiDB1 ansible_host=172.16.10.1 ansible_port=5555`。
 
@@ -315,7 +315,7 @@ UUID=c51eb23b-195c-4061-92a9-3fad812cc12f /data1 ext4 defaults,nodelalloc,noatim
 - 3 个 PD 节点
 - 3 个 TiKV 节点，第一台 TiDB 机器同时用作监控机
 
-默认情况下，单台机器上只需部署一个 TiKV 实例。如果你的 TiKV 部署机器 CPU 及内存配置是[部署建议](/how-to/deploy/hardware-recommendations.md)的两倍或以上，并且拥有两块 SSD 硬盘或单块容量超 2T 的 SSD 硬盘，可以考虑部署两实例，但不建议部署两个以上实例。
+默认情况下，单台机器上只需部署一个 TiKV 实例。如果你的 TiKV 部署机器 CPU 及内存配置是[部署建议](/v2.1/how-to/deploy/hardware-recommendations.md)的两倍或以上，并且拥有两块 SSD 硬盘或单块容量超 2T 的 SSD 硬盘，可以考虑部署两实例，但不建议部署两个以上实例。
 
 ### 单机单 TiKV 实例集群拓扑
 
@@ -381,6 +381,7 @@ UUID=c51eb23b-195c-4061-92a9-3fad812cc12f /data1 ext4 defaults,nodelalloc,noatim
 172.16.10.2
 172.16.10.3
 
+# 注意：要使用 TiKV 的 labels，必须同时配置 PD 的 location_labels 参数，否则 labels 设置不生效。
 [tikv_servers]
 TiKV1-1 ansible_host=172.16.10.4 deploy_dir=/data1/deploy tikv_port=20171 labels="host=tikv1"
 TiKV1-2 ansible_host=172.16.10.4 deploy_dir=/data2/deploy tikv_port=20172 labels="host=tikv1"
@@ -411,6 +412,7 @@ TiKV3-2 ansible_host=172.16.10.6 deploy_dir=/data2/deploy tikv_port=20172 labels
 172.16.10.5
 172.16.10.6
 
+# 注意：为使 TiKV 的 labels 设置生效，部署集群时必须设置 PD 的 location_labels 参数。
 [pd_servers:vars]
 location_labels = ["host"]
 ```
@@ -436,7 +438,7 @@ location_labels = ["host"]
             # low-concurrency: 8
         ```
 
-        > **注意：**
+        > **Note:**
         > 
         > 推荐配置：实例数 \* 参数值 = CPU 核数 * 0.8。
 
@@ -447,7 +449,7 @@ location_labels = ["host"]
           capacity: 0
         ```
 
-        > **注意：**
+        > **Note:**
         > 
         > 推荐配置：`capacity` = 磁盘总容量 / TiKV 实例数量，例如：`capacity: "100GB"`。
 
@@ -471,30 +473,30 @@ TiKV1-1 ansible_host=172.16.10.4 deploy_dir=/data1/deploy
 
 #### 其他变量调整
 
-> **注意：**
+> **Note:**
 > 
 > 以下控制变量开启请使用首字母大写 `True`，关闭请使用首字母大写 `False`。
 
-| 变量                             | 含义                                                                                                                                                                                                                                                  |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| cluster_name                   | 集群名称，可调整                                                                                                                                                                                                                                            |
-| tidb_version                   | TiDB 版本，TiDB-Ansible 各分支默认已配置                                                                                                                                                                                                                       |
-| process_supervision            | 进程监管方式，默认为 systemd，可选 supervise                                                                                                                                                                                                                     |
-| timezone                       | 新安装 TiDB 集群第一次启动 bootstrap（初始化）时，将 TiDB 全局默认时区设置为该值。TiDB 使用的时区后续可通过 `time_zone` 全局变量和 session 变量来修改，参考[时区支持](/how-to/configure/time-zone.md)。 默认为 `Asia/Shanghai`，可选值参考 [timzone 列表](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)。 |
-| enable_firewalld               | 开启防火墙，默认不开启，如需开启，请将[部署建议-网络要求](/how-to/deploy/hardware-recommendations.md#网络要求) 中的端口加入白名单                                                                                                                                                           |
-| enable_ntpd                    | 检测部署目标机器 NTP 服务，默认为 True，请勿关闭                                                                                                                                                                                                                       |
-| set_hostname                   | 根据 IP 修改部署目标机器主机名，默认为 False                                                                                                                                                                                                                         |
-| enable_binlog                  | 是否部署 pump 并开启 binlog，默认为 False，依赖 Kafka 集群，参见 `zookeeper_addrs` 变量                                                                                                                                                                                  |
-| zookeeper_addrs                | binlog Kafka 集群的 zookeeper 地址                                                                                                                                                                                                                       |
-| enable_slow_query_log        | TiDB 慢查询日志记录到单独文件({{ deploy_dir }}/log/tidb_slow_query.log)，默认为 False，记录到 tidb 日志                                                                                                                                                                 |
-| deploy_without_tidb          | KV 模式，不部署 TiDB 服务，仅部署 PD、TiKV 及监控服务，请将 `inventory.ini` 文件中 tidb_servers 主机组 IP 设置为空。                                                                                                                                                                |
-| alertmanager_target            | 可选：如果你已单独部署 alertmanager，可配置该变量，格式：alertmanager_host:alertmanager_port                                                                                                                                                                            |
-| grafana_admin_user           | Grafana 管理员帐号用户名，默认为 admin                                                                                                                                                                                                                          |
-| grafana_admin_password       | Grafana 管理员帐号密码，默认为 admin，用于 Ansible 导入 Dashboard 和创建 API Key，如后期通过 grafana web 修改了密码，请更新此变量                                                                                                                                                        |
-| collect_log_recent_hours     | 采集日志时，采集最近几个小时的日志，默认为 2 小时                                                                                                                                                                                                                          |
-| enable_bandwidth_limit       | 在中控机上从部署目标机器拉取诊断数据时，是否限速，默认为 True，与 collect_bandwidth_limit 变量结合使用                                                                                                                                                                                |
-| collect_bandwidth_limit      | 在中控机上从部署目标机器拉取诊断数据时限速多少，单位: Kbit/s，默认 10000，即 10Mb/s，如果是单机多 TiKV 实例部署方式，需除以单机实例个数                                                                                                                                                                   |
-| prometheus_storage_retention | Prometheus 监控数据的保留时间（默认为 30 天）；2.1.7、3.0 以及之后的 tidb-ansible 版本中，`group_vars/monitoring_servers.yml` 文件里新增的配置                                                                                                                                        |
+| 变量                             | 含义                                                                                                                                                                                                                                                       |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| cluster_name                   | 集群名称，可调整                                                                                                                                                                                                                                                 |
+| tidb_version                   | TiDB 版本，TiDB Ansible 各分支默认已配置                                                                                                                                                                                                                            |
+| process_supervision            | 进程监管方式，默认为 systemd，可选 supervise                                                                                                                                                                                                                          |
+| timezone                       | 新安装 TiDB 集群第一次启动 bootstrap（初始化）时，将 TiDB 全局默认时区设置为该值。TiDB 使用的时区后续可通过 `time_zone` 全局变量和 session 变量来修改，参考[时区支持](/v2.1/how-to/configure/time-zone.md)。 默认为 `Asia/Shanghai`，可选值参考 [timzone 列表](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones)。 |
+| enable_firewalld               | 开启防火墙，默认不开启，如需开启，请将[部署建议-网络要求](/v2.1/how-to/deploy/hardware-recommendations.md#网络要求) 中的端口加入白名单                                                                                                                                                           |
+| enable_ntpd                    | 检测部署目标机器 NTP 服务，默认为 True，请勿关闭                                                                                                                                                                                                                            |
+| set_hostname                   | 根据 IP 修改部署目标机器主机名，默认为 False                                                                                                                                                                                                                              |
+| enable_binlog                  | 是否部署 pump 并开启 binlog，默认为 False，依赖 Kafka 集群，参见 `zookeeper_addrs` 变量                                                                                                                                                                                       |
+| zookeeper_addrs                | binlog Kafka 集群的 zookeeper 地址                                                                                                                                                                                                                            |
+| enable_slow_query_log        | TiDB 慢查询日志记录到单独文件({{ deploy_dir }}/log/tidb_slow_query.log)，默认为 False，记录到 tidb 日志                                                                                                                                                                      |
+| deploy_without_tidb          | KV 模式，不部署 TiDB 服务，仅部署 PD、TiKV 及监控服务，请将 `inventory.ini` 文件中 tidb_servers 主机组 IP 设置为空。                                                                                                                                                                     |
+| alertmanager_target            | 可选：如果你已单独部署 alertmanager，可配置该变量，格式：alertmanager_host:alertmanager_port                                                                                                                                                                                 |
+| grafana_admin_user           | Grafana 管理员帐号用户名，默认为 admin                                                                                                                                                                                                                               |
+| grafana_admin_password       | Grafana 管理员帐号密码，默认为 admin，用于 Ansible 导入 Dashboard 和创建 API Key，如后期通过 grafana web 修改了密码，请更新此变量                                                                                                                                                             |
+| collect_log_recent_hours     | 采集日志时，采集最近几个小时的日志，默认为 2 小时                                                                                                                                                                                                                               |
+| enable_bandwidth_limit       | 在中控机上从部署目标机器拉取诊断数据时，是否限速，默认为 True，与 collect_bandwidth_limit 变量结合使用                                                                                                                                                                                     |
+| collect_bandwidth_limit      | 在中控机上从部署目标机器拉取诊断数据时限速多少，单位: Kbit/s，默认 10000，即 10Mb/s，如果是单机多 TiKV 实例部署方式，需除以单机实例个数                                                                                                                                                                        |
+| prometheus_storage_retention | Prometheus 监控数据的保留时间（默认为 30 天）；2.1.7、3.0 以及之后的 tidb-ansible 版本中，`group_vars/monitoring_servers.yml` 文件里新增的配置                                                                                                                                             |
 
 ## 部署任务
 
@@ -542,7 +544,7 @@ TiKV1-1 ansible_host=172.16.10.4 deploy_dir=/data1/deploy
     ansible-playbook deploy.yml
     ```
 
-    > **注意：**
+    > **Note:**
     > 
     > Grafana Dashboard 上的 Report 按钮可用来生成 PDF 文件，此功能依赖 `fontconfig` 包和英文字体。如需使用该功能，登录 **grafana_servers** 机器，用以下命令安装：
     > 
@@ -635,7 +637,7 @@ synchronised to NTP server (85.199.214.101) at stratum 2
    polling server every 1024 s
 ```
 
-> **注意：**
+> **Note:**
 > 
 > Ubuntu 系统需安装 ntpstat 软件包。
 
