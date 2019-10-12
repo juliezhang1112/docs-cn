@@ -22,7 +22,7 @@ Ansible 是一款自动化运维工具，[TiDB-Ansible](https://github.com/pingc
 - [清除集群数据](/how-to/maintain/ansible-operations.md#清除集群数据)
 - [销毁集群](/how-to/maintain/ansible-operations.md#销毁集群)
 
-> **注意：**
+> **Note:**
 > 
 > 对于生产环境，须使用 TiDB-Ansible 部署 TiDB 集群。如果只是用于测试 TiDB 或体验 TiDB 的特性，建议[使用 Docker Compose 在单机上快速部署 TiDB 集群](/how-to/get-started/deploy-tidb-from-docker-compose.md)。
 
@@ -34,7 +34,7 @@ Ansible 是一款自动化运维工具，[TiDB-Ansible](https://github.com/pingc
     - 推荐安装 CentOS 7.3 及以上版本 Linux 操作系统，x86_64 架构 (amd64)。
     - 机器之间内网互通。
 
-    > **注意：**
+    > **Note:**
     > 
     > 使用 Ansible 方式部署时，TiKV 及 PD 节点数据目录所在磁盘请使用 SSD 磁盘，否则无法通过检测。** 如果仅验证功能，建议使用 [Docker Compose 部署方案](/how-to/get-started/deploy-tidb-from-docker-compose.md)单机进行测试。
 
@@ -125,7 +125,7 @@ The key's randomart image is:
 $ git clone https://github.com/pingcap/tidb-ansible.git
 ```
 
-> **注意：**
+> **Note:**
 > 
 > - 部署和升级 TiDB 集群需使用对应的 tidb-ansible 版本，通过改 `inventory.ini` 文件中的版本来混用可能会产生一些错误。
 > - 请务必按文档操作，将 `tidb-ansible` 下载到 `/home/tidb` 目录下，权限为 `tidb` 用户，不要下载到 `/root` 下，否则会遇到权限问题。
@@ -297,7 +297,7 @@ UUID=c51eb23b-195c-4061-92a9-3fad812cc12f /data1 ext4 defaults,nodelalloc,noatim
 
 以 `tidb` 用户登录中控机，`inventory.ini` 文件路径为 `/home/tidb/tidb-ansible/inventory.ini`。
 
-> **注意：**
+> **Note:**
 > 
 > 请使用内网 IP 来部署集群，如果部署目标机器 SSH 端口非默认 22 端口，需添加 `ansible_port` 变量，如 `TiDB1 ansible_host=172.16.10.1 ansible_port=5555`。
 
@@ -417,7 +417,7 @@ location_labels = ["host"]
             capacity: "1GB"
         ```
 
-        > **注意：**
+        > **Note:**
         > 
         > TiKV 实例数量指每个服务器上 TiKV 的进程数量。
         > 
@@ -435,7 +435,7 @@ location_labels = ["host"]
             # low-concurrency: 8
         ```
 
-        > **注意：**
+        > **Note:**
         > 
         > 推荐设置：TiKV 实例数量 \* 参数值 = CPU 核心数量 \* 0.8
 
@@ -446,7 +446,7 @@ location_labels = ["host"]
           capacity: 0
         ```
 
-        > **注意：**
+        > **Note:**
         > 
         > 推荐配置：`capacity` = 磁盘总容量 / TiKV 实例数量
         > 
@@ -472,7 +472,7 @@ TiKV1-1 ansible_host=172.16.10.4 deploy_dir=/data1/deploy
 
 #### 其他变量调整
 
-> **注意：**
+> **Note:**
 > 
 > 以下控制变量开启请使用首字母大写 `True`，关闭请使用首字母大写 `False`。
 
@@ -543,7 +543,7 @@ TiKV1-1 ansible_host=172.16.10.4 deploy_dir=/data1/deploy
     ansible-playbook deploy.yml
     ```
 
-    > **注意：**
+    > **Note:**
     > 
     > Grafana Dashboard 上的 Report 按钮可用来生成 PDF 文件，此功能依赖 `fontconfig` 包和英文字体。如需使用该功能，登录 **grafana_servers** 机器，用以下命令安装：
     > 
@@ -636,7 +636,7 @@ synchronised to NTP server (85.199.214.101) at stratum 2
    polling server every 1024 s
 ```
 
-> **注意：**
+> **Note:**
 > 
 > Ubuntu 系统需安装 ntpstat 软件包。
 
