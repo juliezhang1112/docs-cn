@@ -1,181 +1,104 @@
 ---
-title: TiDB Binlog 集群运维
+title: TiDB Binlog 集群监控
 category: reference
 ---
 
-# TiDB Binlog 集群运维
+# TiDB Binlog 集群监控
 
-## Pump/Drainer 状态
+使用 Ansible 成功部署 TiDB Binlog 集群后，可以进入 Grafana Web 界面（默认地址: <http://grafana_ip:3000>，默认账号：admin，密码：admin）查看 Pump 和 Drainer 的运行状态。
 
-Pump/Drainer 中状态的定义：
+## 监控指标
 
-* online：正常运行中。
-* pausing：暂停中，当使用 kill 或者 Ctrl+C 退出进程时，都将处于该状态。当 Pump/Drainer 安全退出了所有的内部线程后，将自己的状态切换为 paused。
-* paused：已暂停，处于该状态时 Pump 不接受写 binlog 的请求，也不继续为 Drainer 提供 binlog，Drainer 不再往下游同步数据。
-* closing：下线中，使用 binlogctl 控制 Pump/Drainer 下线，在进程退出前都处于该状态。下线时 Pump 不再接受写 binlog 的请求，等待所有的 binlog 数据被 Drainer 消费完。
-* offline：已下线，当 Pump 已经将已保存的所有 binlog 数据全部发送给 Drainer 后，该 Pump 将状态切换为 offline。
+### Pump
 
-> **Note:**
-> 
-> * 当暂停 Pump/Drainer 时，数据同步会中断。
-> * Pump/Drainer 的状态需要区分已暂停（paused）和下线（offline），Ctrl + C 或者 kill 进程，Pump 和 Drainer 的状态会变为 pausing，最终变为 paused。进入 paused 状态前 Pump 不需要将已保存的 binlog 数据全部发送到 Drainer，进入 offline 状态前 pump 需要将已保存的 binlog 数据全部发送到 Drainer。如果需要较长时间退出 Pump（或不再使用该 Pump），需要使用 binlogctl 工具来下线 Pump。Drainer 同理。
-> * Pump 在下线时需要确认自己的数据被所有的非 offline 状态的 Drainer 消费了，所以在下线 Pump 时需要确保所有的 Drainer 都是处于 online 状态，否则 Pump 无法正常下线。
-> * Pump 保存的 binlog 数据只有在被所有非 offline 状态的 Drainer 消费的情况下才会被 GC 处理。
-> * 不要轻易下线 Drainer，只有在永久不需要使用该 Drainer 的情况下才需要下线 Drainer。
+| metric 名称                    | 说明                                                                                      |
+|:---------------------------- |:--------------------------------------------------------------------------------------- |
+| Storage Size                 | 记录磁盘的总空间大小 (capacity)，以及可用磁盘空间大小 (available)                                            |
+| Metadata                     | 记录每个 Pump 的可删除 binlog 的最大 tso (gc_tso)，以及保存的 binlog 的最大的 commit tso (max_commit_tso)。 |
+| Write Binlog QPS by Instance | 每个 Pump 接收到的写 binlog 请求的 QPS                                                            |
+| Write Binlog Latency         | 记录每个 Pump 写 binlog 的延迟时间                                                                |
+| Storage Write Binlog Size    | Pump 写 binlog 数据的大小                                                                     |
+| Storage Write Binlog Latency | Pump 中的 storage 模块写 binlog 数据的延迟                                                        |
+| Pump Storage Error By Type   | Pump 遇到的 error 数量，按照 error 的类型进行统计                                                      |
+| Query TiKV                   | Pump 通过 TiKV 查询事务状态的次数                                                                  |
 
-关于 Pump/Drainer 暂停、下线、状态查询、状态修改等具体的操作方法，参考如下 binlogctl 工具的使用方法介绍。
 
-## binlogctl 工具
+### Drainer
 
-* 获取 TiDB 集群当前的 TSO
-* 查看 Pump/Drainer 状态
-* 修改 Pump/Drainer 状态
-* 暂停/下线 Pump/Drainer
+| metric 名称                         | 说明                                                                                                                  |
+|:--------------------------------- |:------------------------------------------------------------------------------------------------------------------- |
+| Checkpoint TSO                    | Drainer 已经同步到下游的 binlog 的最大 TSO 对应的时间。可以通过该指标估算同步延迟时间                                                               |
+| Pump Handle TSO                   | 记录 Drainer 从各个 Pump 获取到的 binlog 的最大 TSO 对应的时间 | | Pull Binlog QPS by Pump NodeID | Drainer 从每个 Pump 获取 binlog 的 QPS |
+| 95% Binlog Reach Duration By Pump | 记录 binlog 从写入 Pump 到被 Drainer 获取到这个过程的延迟时间                                                                          |
+| Error By Type                     | Drainer 遇到的 error 数量，按照 error 的类型进行统计                                                                               |
+| Drainer Event                     | 各种类型 event 的数量，event 包括 ddl、insert、delete、update、flush、savepoint                                                    |
+| Execute Time                      | 在下游执行 SQL 语句或写数据所消耗的时间                                                                                              |
+| 95% Binlog Size                   | Drainer 从各个 Pump 获取到 binlog 数据的大小                                                                                   |
+| DL Job Count                      | Drainer 处理的 DDL 的数量                                                                                                 |
 
-使用 binlogctl 的场景：
 
-* 第一次运行 Drainer，需要获取 TiDB 集群当前的 TSO
-* Pump/Drainer 异常退出，状态没有更新，对业务造成影响，可以直接使用该工具修改状态
-* 同步出现故障/检查运行情况，需要查看 Pump/Drainer 的状态
-* 维护集群，需要暂停/下线 Pump/Drainer
+## 监控告警规则
 
-binlogctl 下载链接：
+### Emergency
 
-```bash
-wget https://download.pingcap.org/tidb-{version}-linux-amd64.tar.gz
-wget https://download.pingcap.org/tidb-{version}-linux-amd64.sha256
+#### binlog_pump_storage_error_count
 
-# 检查文件完整性，返回 ok 则正确
-sha256sum -c tidb-{version}-linux-amd64.sha256
-```
+- 含义：Pump 写 binlog 到本地存储时失败
+- 监控规则：changes(binlog_pump_storage_error_count[1m]) > 0
+- 处理方法：先确认 pump_storage_error 监控是否存在错误，查看 Pump 日志确认原因
 
-对于 v2.1.0 GA 及以上版本，binlogctl 已经包含在 TiDB 的下载包中，其他版本需要单独下载 binlogctl:
+### Critical
 
-```bash
-wget https://download.pingcap.org/tidb-enterprise-tools-latest-linux-amd64.tar.gz
-wget https://download.pingcap.org/tidb-enterprise-tools-latest-linux-amd64.sha256
+#### binlog_drainer_checkpoint_high_delay
 
-# 检查文件完整性，返回 ok 则正确
-sha256sum -c tidb-enterprise-tools-latest-linux-amd64.sha256
-```
-
-binlogctl 使用说明：
-
-命令行参数：
-
-```bash
-Usage of binlogctl:
--V
-输出 binlogctl 的版本信息
--cmd string
-    命令模式，包括 "generate_meta", "pumps", "drainers", "update-pump" ,"update-drainer", "pause-pump", "pause-drainer", "offline-pump", "offline-drainer"
--data-dir string
-    保存 Drainer 的 checkpoint 的文件的路径 (默认 "binlog_position")
--node-id string
-    Pump/Drainer 的 ID
--pd-urls string
-    PD 的地址，如果有多个，则用"," 连接 (默认 "http://127.0.0.1:2379")
--ssl-ca string
-    SSL CAs 文件的路径
--ssl-cert string
-        PEM 格式的 X509 认证文件的路径
--ssl-key string
-        PEM 格式的 X509 key 文件的路径
--time-zone string
-    如果设置时区，在 "generate_meta" 模式下会打印出获取到的 tso 对应的时间。例如"Asia/Shanghai" 为 CST 时区，"Local" 为本地时区
-```
-
-命令示例：
-
-- 查询所有的 Pump/Drainer 的状态：
+- 含义：Drainer 同步落后延迟超过 1 个小时
+- 监控规则：(time() - binlog_drainer_checkpoint_tso / 1000) > 3600
+- 处理方法：
     
-    设置 `cmd` 为 `pumps` 或者 `drainers` 来查看所有 Pump 或者 Drainer 的状态。例如：
+    - 判断从 Pump 获取数据是否太慢：
+        
+        监控 Pump handle tso 可以看每个 Pump 最近一条消息的时间，是不是有延迟特别大的 Pump，确认对应 Pump 正常运行
     
-    ```bash
-    bin/binlogctl -pd-urls=http://127.0.0.1:2379 -cmd pumps
-    
-    [2019/04/28 09:29:59.016 +00:00] [INFO] [nodes.go:48] ["query node"] [type=pump] [node="{NodeID: 1.1.1.1:8250, Addr: pump:8250, State: online, MaxCommitTS: 408012403141509121, UpdateTime: 2019-04-28 09:29:57 +0000 UTC}"]
-    ```
+    - 根据 Drainer event 和 Drainer execute latency 来判断是否下游同步太慢：
+        
+        - 如果 Drainer execute time 过大，则检查到目标库网络带宽和延迟，以及目标库状态
+        - 如果 Drainer execute time 不大，Drainer event 过小，则增加 work count 和 batch 进行重试
+    - 上面都不满足或者操作后没有改观，则报备开发 support@pingcap.com 进行处理
 
-- 修改 Pump/Drainer 的状态
-    
-    设置 `cmd` 为 `update-pump` 或者 `update-drainer` 来更新 Pump 或者 Drainer 的状态。Pump 和 Drainer 的状态可以为：online，pausing，paused，closing 以及 offline。例如：
-    
-        bash
-          bin/binlogctl -pd-urls=http://127.0.0.1:2379 -cmd update-pump -node-id ip-127-0-0-1:8250 -state paused
-    
-    这条命令会修改 Pump/Drainer 保存在 PD 中的状态，仅在 Pump/Drainer 服务异常的情况下使用。
+### Warning
 
-- 暂停/下线 Pump/Drainer
-    
-    分别设置 `cmd` 为 `pause-pump`、`pause-drainer`、`offline-pump`、`offline-drainer` 来暂停 Pump、暂停 Drainer、下线 Pump、下线 Drainer。例如：
-    
-    ```bash
-    bin/binlogctl -pd-urls=http://127.0.0.1:2379 -cmd pause-pump -node-id ip-127-0-0-1:8250
-    ```
-    
-    binlogctl 会发送 HTTP 请求给 Pump/Drainer，Pump/Drainer 收到命令后会退出进程，并且将自己的状态设置为 paused/offline。
+#### binlog_pump_write_binlog_rpc_duration_seconds_bucket
 
-- 生成 Drainer 启动需要的 meta 文件
+- 含义：Pump 处理 TiDB 写 Binlog 请求耗时过大
+- 监控规则：histogram_quantile(0.9, rate(binlog_pump_rpc_duration_seconds_bucket{method="WriteBinlog"}[5m])) > 1
+- 处理方法：
     
-    ```bash bin/binlogctl -pd-urls=http://127.0.0.1:2379 -cmd generate_meta
-    
-    INFO\[0000\] \[pd\] create pd client with endpoints \[http://192.168.199.118:32379] INFO[0000\] \[pd\] leader switches to: http://192.168.199.118:32379, previous: INFO\[0000\] \[pd\] init cluster id 6569368151110378289 \[2019/04/28 09:33:15.950 +00:00\] \[INFO\] \[meta.go:114\] \["save meta"\] [meta="commitTS: 408012454863044609"] ```
-    
-    该命令会生成一个文件 `{data-dir}/savepoint`，该文件中保存了 Drainer 初次启动需要的 tso 信息。
+    - 确认磁盘性能压力，通过 node exported 查看 disk performance 监控
+    - 如果 disk latency 和 util 都很低，那么报备研发 support@pingcap.com 处理
 
-## 使用 TiDB SQL 管理 Pump/Drainer
+#### binlog_pump_storage_write_binlog_duration_time_bucket
 
-要查看和管理 binlog 相关的状态，可在 TiDB 中执行相应的 SQL 语句。
+- 含义：Pump 写本地 binlog 到本地盘的耗时
+- 监控规则：histogram_quantile(0.9, rate(binlog_pump_storage_write_binlog_duration_time_bucket{type="batch"}[5m])) > 1
+- 处理方法：确认 Pump 本地盘情况，进行修复
 
-- 查看 TiDB 是否开启 binlog
-    
-    ```bash
-    mysql> show variables like "log_bin";
-    +---------------+-------+
-    | Variable_name | Value |
-    +---------------+-------+
-    | log_bin       |  ON   |
-    +---------------+-------+
-    ```
-    
-    值为 `ON` 时表示 TiDB 开启了 binlog。
+#### binlog_pump_storage_available_size_less_than_20G
 
-- 查看 Pump/Drainer 状态
-    
-        bash
-          mysql> show pump status;
-          +--------|----------------|--------|--------------------|---------------------|
-          | NodeID |     Address    | State  |   Max_Commit_Ts    |    Update_Time      |
-          +--------|----------------|--------|--------------------|---------------------|
-          | pump1  | 127.0.0.1:8250 | Online | 408553768673342237 | 2019-05-01 00:00:01 |
-          +--------|----------------|--------|--------------------|---------------------|
-          | pump2  | 127.0.0.2:8250 | Online | 408553768673342335 | 2019-05-01 00:00:02 |
-          +--------|----------------|--------|--------------------|---------------------|
-    
-        bash
-          mysql> show drainer status;
-          +----------|----------------|--------|--------------------|---------------------|
-          |  NodeID  |     Address    | State  |   Max_Commit_Ts    |    Update_Time      |
-          +----------|----------------|--------|--------------------|---------------------|
-          | drainer1 | 127.0.0.3:8249 | Online | 408553768673342532 | 2019-05-01 00:00:03 |
-          +----------|----------------|--------|--------------------|---------------------|
-          | drainer2 | 127.0.0.4:8249 | Online | 408553768673345531 | 2019-05-01 00:00:04 |
-          +----------|----------------|--------|--------------------|---------------------|
+- 含义：Pump 剩余可用磁盘空间不足 20G
+- 监控规则：binlog_pump_storage_storage_size_bytes{type="available"} < 20 * 1024 * 1024 * 1024
+- 处理方法：监控确认 Pump gc_tso 正常，需要的话调整 Pump gc 时间配置或者下线对应 Pump
 
-- 修改 Pump/Drainer 状态
-    
-    ```bach
-    mysql> change pump to node_state ='paused' for node_id 'pump1'";
-    Query OK, 0 rows affected (0.01 sec)
-    ```
-    
-    ```bach
-    mysql> change drainer to node_state ='paused' for node_id 'drainer1'";
-    Query OK, 0 rows affected (0.01 sec)
-    ```
+#### binlog_drainer_checkpoint_tso_no_change_for_1m
 
-> **Note:**
-> 
-> 1. 查看 binlog 开启状态以及 Pump/Drainer 状态的功能在 TiDB v2.1.7 及以上版本中支持。
-> 2. 修改 Pump/Drainer 状态的功能在 TiDB v3.0.0-rc.1 及以上版本中支持。该功能只修改 PD 中存储的 Pump/Drainer 状态，如果需要暂停/下线节点，仍然需要使用 `binlogctl`。
+- 含义：Drainer checkpoint 一分钟没有更新
+- 监控规则：changes(binlog_drainer_checkpoint_tso[1m]) < 1
+- 处理方法：确认是否所有非下线 Pump 正常运行
+
+#### binlog_drainer_execute_duration_time_more_than_10s
+
+- 含义：Drainer 同步到 TiDB 的 transaction 耗时，如果过大则影响 Drainer 同步
+- 监控规则：histogram_quantile(0.9, rate(binlog_drainer_execute_duration_time_bucket[1m])) > 10
+- 处理方法：
+    
+    - 查看 TiDB cluster 状态情况
+    - 查看 Drainer 日志或监控，如果是 DDL 则忽略
