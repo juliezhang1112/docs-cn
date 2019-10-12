@@ -7,7 +7,7 @@ aliases:
 
 # 慢查询日志
 
-TiDB 会将执行时间超过 [slow-threshold](/reference/configuration/tidb-server/configuration-file.md#slow-threshold)（默认值为 300 毫秒）的语句输出到 [slow-query-file](/reference/configuration/tidb-server/configuration-file.md#slow-query-file)（默认值："tidb-slow.log"）日志文件中，用于帮助用户定位慢查询语句，分析和解决 SQL 执行的性能问题。
+TiDB 会将执行时间超过 [slow-threshold](/v2.1/reference/configuration/tidb-server/configuration-file.md#slow-threshold)（默认值为 300 毫秒）的语句输出到 [slow-query-file](/v2.1/reference/configuration/tidb-server/configuration-file.md#slow-query-file)（默认值："tidb-slow.log"）日志文件中，用于帮助用户定位慢查询语句，分析和解决 SQL 执行的性能问题。
 
 ## 日志示例
 
@@ -32,7 +32,7 @@ insert into t select * from t;
 
 ## 字段含义说明
 
-> **注意：**
+> **Note:**
 > 
 > 慢查询日志中所有时间相关字段的单位都是 **“秒”**
 
@@ -76,9 +76,9 @@ Slow Query 基础信息：
 
 ## 慢日志内存映射表
 
-用户可通过查询 `INFORMATION_SCHEMA.SLOW_QUERY` 表来查询慢查询日志中的内容，表中列名和慢日志中字段名一一对应，表结构可查看 [Information Schema](reference/system-databases/information-schema.md#information-schema) 中关于 `SLOW_QUERY` 表的介绍。
+用户可通过查询 `INFORMATION_SCHEMA.SLOW_QUERY` 表来查询慢查询日志中的内容，表中列名和慢日志中字段名一一对应，表结构可查看 [Information Schema](/v2.1/reference/system-databases/information-schema.md#information-schema) 中关于 `SLOW_QUERY` 表的介绍。
 
-> **注意：**
+> **Note:**
 > 
 > 每次查询 `SLOW_QUERY` 表时，TiDB 都会去读取和解析一次当前的慢查询日志。
 
@@ -220,7 +220,7 @@ set tidb_slow_query_file = "/path-to-log/tidb-slow.log"
 
 可以用 `pt-query-digest` 工具分析 TiDB 慢日志。
 
-> **注意：**
+> **Note:**
 > 
 > 建议使用 pt-query-digest 3.0.13 及以上版本。
 
