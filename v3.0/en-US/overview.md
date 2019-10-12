@@ -1,72 +1,490 @@
 ---
-title: 跨数据中心部署方案
-category: how-to
+title: 数据同步功能
+summary: DM 提供的功能及其配置介绍
+category: reference
 aliases:
-  - '/docs-cn/op-guide/cross-dc-deployment/'
+  - '/docs-cn/tools/dm/data-synchronization-features/'
 ---
 
-# 跨数据中心部署方案
+# 数据同步功能
 
-作为 NewSQL 数据库，TiDB 兼顾了传统关系型数据库的优秀特性以及 NoSQL 数据库可扩展性，以及跨数据中心（下文简称“中心”）场景下的高可用。本文档旨在介绍跨数据中心部署的不同解决方案。
+本文将详细介绍 DM 提供的数据同步功能，以及相关的配置选项。
 
-## 三中心部署方案
+## Table routing
 
-TiDB, TiKV, PD 分别分布在 3 个不同的中心，这是最常规，可用性最高的方案。
-
-![三中心部署](/media/deploy-3dc.png)
-
-### 优点
-
-所有数据的副本分布在三个数据中心，任何一个数据中心失效后，另外两个数据中心会自动发起 leader election，并在合理长的时间内（通常情况 20s 以内）恢复服务，并且不会产生数据丢失。
-
-![三中心部署容灾](/media/deploy-3dc-dr.png)
-
-### 缺点
-
-性能受网络延迟影响。
-
-- 对于写入的场景，所有写入的数据需要同步复制到至少 2 个数据中心，由于 TiDB 写入过程使用两阶段提交，故写入延迟至少需要 2 倍数据中心间的延迟。
-- 对于读请求来说，如果数据 leader 与发起读取的 TiDB 节点不在同一个数据中心，也会受网络延迟影响。
-- TiDB 中的每个事务都需要向 PD leader 获取 TSO，当 TiDB 与 PD leader 不在同一个数据中心时，它上面运行的事务也会因此受网络延迟影响，每个有写入的事务会获取两次 TSO。
-
-### 读性能优化
-
-如果不需要每个数据中心同时对外提供服务，可以将业务流量全部派发到一个数据中心，并通过调度策略把 Region leader 和 PD leader 都迁移到同一个数据中心（我们在上文所述的测试中也做了这个优化）。这样一来，不管是从 PD 获取 TSO 还是读取 Region 都不受数据中心间网络的影响。当该数据中心失效后，PD leader 和 Region leader 会自动在其它数据中心选出，只需要把业务流量转移至其他存活的数据中心即可。
-
-![三中心部署读性能优化](/media/deploy-3dc-optimize.png)
-
-## 两地三中心部署方案
-
-两地三中心的方案与三数据中心类似，算是三机房方案根据业务特点进行的优化，区别是其中有两个数据中心距离很近（通常在同一个城市），网络延迟相对很小。这种场景下，我们可以把业务流量同时派发到同城的两个数据中心，同时控制 Region leader 和 PD leader 也分布在同城的两个数据中心。
-
-![两地三中心部署方案](/media/deploy-2city3dc.png)
-
-与三数据中心方案相比，两地三中心有以下优势：
-
-- 写入速度更优
-- 两中心同时提供服务资源利用率更高
-- 依然能保证任何一个数据中心失效后保持可用并且不发生数据丢失
-
-但是，缺陷是如果同城的两个数据中心同时失效（理论上讲要高于异地三数据中心损失 2 个的概率），将会导致不可用以及部分数据丢失。
-
-## 两数据中心 + binlog 同步方案
-
-两数据中心 + binlog 同步类似于传统的 MySQL 中 master/slave 方案。两个数据中心分别部署一套完整的 TiDB 集群，我们称之为主集群和从集群。正常情况下所有的请求都在主集群，写入的数据通过 binlog 异步同步至从集群并写入。
-
-![binlog 同步部署方案](/media/deploy-binlog.png)
-
-当主集群整个数据中心失效后，业务可以切换至从集群，与 MySQL 类似，这种情况下会有一些数据缺失。对比 MySQL，这个方案的优势是数据中心内的 HA -- 少部分节点故障时，通过重新选举 leader 自动恢复服务，不需要人工干预。
-
-![两中心 binlog 相互备份方案](/media/deploy-backup.png)
-
-另外部分用户采用这种方式做双数据中心多活，两个数据中心各有一个集群，将业务分为两个库，每个库服务一部分数据，每个数据中心的业务只会访问一个库，两个集群之间通过 binlog 将本数据中心业务所涉及的库中的数据变更同步到对端机房，形成环状备份。
+Table routing 提供将上游 MySQL/MariaDB 实例的某些表同步到下游指定表的功能。
 
 > **注意：**
 > 
-> 在两数据中心 + binlog 同步部署方案中，数据中心之间只有 binlog 异步复制。在数据中心间的延迟较高的情况下，从集群落后主集群的数据量会增大。当主集群故障后（DR），会造成数据丢失，丢失的数据量受网络延迟等因素影响。
+> - 不支持对同一个表设置多个不同的路由规则。
+> - Schema 的匹配规则需要单独设置，用来同步 `create/drop schema xx`，例如下面[参数配置](#参数配置)中的 rule-2。
 
-## 高可用和容灾分析
+### 参数配置
 
-对于三数据中心方案和两地三中心方案，我们能得到的保障是任意一个数据中心故障时，集群能自动恢复服务，不需要人工介入，并能保证数据一致性。注意各种调度策略都是用于帮助性能优化的，当发生故障时调度机制总是第一优先考虑可用性而不是性能。
+```yaml
+routes:
+  rule-1:
+    schema-pattern: "test_*"
+    table-pattern: "t_*"
+    target-schema: "test"
+    target-table: "t"
+  rule-2:
+    schema-pattern: "test_*"
+    target-schema: "test"
+```
 
-对于两数据中心 + binlog 同步的方案，主集群内少量节点故障时也能自动恢复服务，不需要人工介入，并能保证数据一致性。当整个主集群故障时，需要人工切换至从集群，并可能发生一些数据丢失，数据丢失的数量取决于同步延迟，和网络条件有关。
+### 参数解释
+
+将根据 [`schema-pattern`/`table-pattern`](/reference/tools/data-migration/table-selector.md) 匹配上该规则的上游 MySQL/MariaDB 实例的表同步到下游的 `target-schema`/`target-table`。
+
+### 使用示例
+
+下面展示了三个不同场景下的配置示例。
+
+#### 分库分表合并
+
+假设存在分库分表场景，需要将上游两个 MySQL 实例的表 `test_{1,2,3...}`.`t_{1,2,3...}` 同步到下游 TiDB 的一张表 `test`.`t`。
+
+为了同步到下游实例的表 `test`.`t` 需要创建两个 table routing 规则：
+
+- `rule-1` 用来同步匹配上 `schema-pattern: "test_*"` 和 `table-pattern: "t_*"` 的表的 DML/DDL 语句到下游的 `test`.`t`。
+- `rule-2` 用来同步匹配上 `schema-pattern: "test_*"` 的库的 DDL 语句，例如 `create/drop schema xx`。
+
+> **注意：**
+> 
+> - 如果下游 TiDB `schema: test` 已经存在， 并且不会被删除，则可以省略 `rule-2`。
+> - 如果下游 TiDB `schema: test` 不存在，只设置了 `rule_1`，则同步会报错 `schema test doesn't exist`。
+
+```yaml
+  rule-1:
+    schema-pattern: "test_*"
+    table-pattern: "t_*"
+    target-schema: "test"
+    target-table: "t"
+  rule-2:
+    schema-pattern: "test_*"
+    target-schema: "test"
+```
+
+#### 分库合并
+
+假设存在分库场景，将上游两个 MySQL 实例 `test_{1,2,3...}`.`t_{1,2,3...}` 同步到下游 TiDB 的 `test`.`t_{1,2,3...}`，创建一条路由规则即可：
+
+```yaml
+  rule-1:
+    schema-pattern: "test_*"
+    target-schema: "test"
+```
+
+#### 错误的 table routing
+
+假设存在下面两个路由规则，`test_1_bak`.`t_1_bak` 可以匹配上 `rule-1` 和 `rule-2`，违反 table 路由的限制而报错。
+
+```yaml
+  rule-0:
+    schema-pattern: "test_*"
+    target-schema: "test"
+  rule-1:
+    schema-pattern: "test_*"
+    table-pattern: "t_*"
+    target-schema: "test"
+    target-table: "t"
+  rule-2:
+    schema-pattern: "test_1_bak"
+    table-pattern: "t_1_bak"
+    target-schema: "test"
+    target-table: "t_bak"
+```
+
+## Black & white table lists
+
+上游数据库实例表的黑白名单过滤规则，可以用来过滤或者只同步某些 `database/table` 的所有操作。
+
+### 参数配置
+
+```yaml
+black-white-list:
+  rule-1:
+    do-dbs: ["~^test.*"]         # 以 ~ 字符开头，表示规则是正则表达式
+​    ignore-dbs: ["mysql"]
+    do-tables:
+    - db-name: "~^test.*"
+      tbl-name: "~^t.*"
+    - db-name: "test"
+      tbl-name: "t"
+    ignore-tables:
+    - db-name: "test"
+      tbl-name: "log"
+```
+
+### 参数解释
+
+- `do-dbs` 要同步的库的白名单
+- `ignore-dbs` 要同步的库的黑名单
+- `do-tables` 要同步的表的白名单
+- `ignore-tables` 要同步的表的黑名单
+- 上面黑白名单中 以 `~` 字符开头名称为[正则表达式](https://golang.org/pkg/regexp/syntax/#hdr-Syntax)。
+
+### 过滤规则
+
+判断 table `test`.`t` 是否应该被过滤的过滤流程如下：
+
+1. 首先 **schema 过滤判断**
+
+    - 如果 `do-dbs` 不为空，判断 `do-dbs` 中是否存在一个匹配的 schema。
+
+        - 如果存在，则进入 **table 过滤判断**。
+        - 如果不存在，则过滤 `test`.`t`。
+
+    - 如果 `do-dbs` 为空并且 `ignore-dbs` 不为空，判断 `ignore-dbs` 中是否存在一个匹配的 schema。
+
+        - 如果存在，则过滤 `test`.`t`。
+        - 如果不存在，则进入 **table 过滤判断**。
+
+    - 如果 `do-dbs` 和 `ignore-dbs` 都为空，则进入 **table 过滤判断**。
+
+2. 进行 **table 过滤判断**
+
+    1. 如果 `do-tables` 不为空，判断 `do-tables` 中是否存在一个匹配的 table。
+
+        - 如果存在，则同步 `test`.`t`。
+        - 如果不存在，则过滤 `test`.`t`。
+
+    2. 如果 `ignore-tables` 不为空，判断 `ignore-tables` 中是否存在一个匹配的 table。
+
+        - 如果存在，则过滤 `test`.`t`.
+        - 如果不存在，则同步 `test`.`t`。
+
+    3. 如果 `do-tables` 和 `ignore-tables` 都为空，则同步 `test`.`t`。
+
+> **注意：**
+> 
+> 判断 schema `test` 是否被过滤，只进行 **schema 过滤判断**
+
+### 使用示例
+
+假设上游 MySQL 实例包含以下表：
+
+```
+`logs`.`messages_2016`
+`logs`.`messages_2017`
+`logs`.`messages_2018`
+`forum`.`users`
+`forum`.`messages`
+`forum_backup_2016`.`messages`
+`forum_backup_2017`.`messages`
+`forum_backup_2018`.`messages`
+```
+
+配置如下：
+
+```yaml
+black-white-list:
+  bw-rule:
+    do-dbs: ["forum_backup_2018", "forum"]
+    ignore-dbs: ["~^forum_backup_"]
+    do-tables:
+    - db-name: "logs"
+      tbl-name: "~_2018$"
+    - db-name: "~^forum.*"
+​      tbl-name: "messages"
+    ignore-tables:
+    - db-name: "~.*"
+​      tbl-name: "^messages.*"
+```
+
+应用 `bw-rule` 规则后：
+
+| table                          | 是否过滤 | 过滤的原因                                                                                                                                       |
+|:------------------------------ |:---- |:------------------------------------------------------------------------------------------------------------------------------------------- |
+| `logs`.`messages_2016`         | 是    | schema `logs` 没有匹配到 `do-dbs` 任意一项                                                                                                           |
+| `logs`.`messages_2017`         | 是    | schema `logs` 没有匹配到 `do-dbs` 任意一项                                                                                                           |
+| `logs`.`messages_2018`         | 是    | schema `logs` 没有匹配到 `do-dbs` 任意一项                                                                                                           |
+| `forum_backup_2016`.`messages` | 是    | schema `forum_backup_2016` 没有匹配到 `do-dbs` 任意一项                                                                                              |
+| `forum_backup_2017`.`messages` | 是    | schema `forum_backup_2017` 没有匹配到 `do-dbs` 任意一项                                                                                              |
+| `forum`.`users`                | 是    | 1. schema `forum` 匹配到 `do-dbs` 进入 table 过滤<br> 2. schema 和 table 没有匹配到 `do-tables` 和 `ignore-tables` 中任意一项，并且 `do-tables` 不为空，因此过滤          |
+| `forum`.`messages`             | 否    | 1. schema `forum` 匹配到 `do-dbs` 进入 table 过滤<br> 2. schema 和 table 匹配到 `do-tables` 的 `db-name: "~^forum.*",tbl-name: "messages"`              |
+| `forum_backup_2018`.`messages` | 否    | 1. schema `forum_backup_2018` 匹配到 `do-dbs` 进入 table 过滤<br> 2. schema 和 table 匹配到 `do-tables` 的  `db-name: "~^forum.*",tbl-name: "messages"` |
+
+## Binlog event filter
+
+Binlog event filter 是比同步表黑白名单更加细粒度的过滤规则，可以指定只同步或者过滤掉某些 `schema / table` 的指定类型 binlog，比如 `INSERT`，`TRUNCATE TABLE`。
+
+> **注意：**
+> 
+> 同一个表匹配上多个规则，将会顺序应用这些规则，并且黑名单的优先级高于白名单，即如果同时存在规则 `Ignore` 和 `Do` 应用在某个 table 上，那么 `Ignore` 生效。
+
+### 参数配置
+
+```yaml
+filters:
+  rule-1:
+    schema-pattern: "test_*"
+    ​table-pattern: "t_*"
+    ​events: ["truncate table", "drop table"]
+    sql-pattern: ["^DROP\\s+PROCEDURE", "^CREATE\\s+PROCEDURE"]
+    ​action: Ignore
+```
+
+### 参数解释
+
+- [`schema-pattern`/`table-pattern`](/reference/tools/data-migration/table-selector.md)：对匹配上的上游 MySQL/MariaDB 实例的表的 binlog events 或者 DDL SQL 语句进行以下规则过滤。
+
+- `events`：binlog events 数组。
+
+    | Event           | 分类  | 解释                    |
+    | --------------- | --- | --------------------- |
+    | all             |     | 代表包含下面所有的 events      |
+    | all dml         |     | 代表包含下面所有 DML events   |
+    | all ddl         |     | 代表包含下面所有 DDL events   |
+    | none            |     | 代表不包含下面所有 events      |
+    | none ddl        |     | 代表不包含下面所有 DDL events  |
+    | none dml        |     | 代表不包含下面所有 DML events  |
+    | insert          | DML | insert DML event      |
+    | update          | DML | update DML event      |
+    | delete          | DML | delete DML event      |
+    | create database | DDL | create database event |
+    | drop database   | DDL | drop database event   |
+    | create table    | DDL | create table event    |
+    | create index    | DDL | create index event    |
+    | drop table      | DDL | drop table event      |
+    | truncate table  | DDL | truncate table event  |
+    | rename table    | DDL | rename table event    |
+    | drop index      | DDL | drop index event      |
+    | alter table     | DDL | alter table event     |
+
+- `sql-pattern`：用于过滤指定的 DDL SQL 语句，支持正则表达式匹配，例如上面示例 `"^DROP\\s+PROCEDURE"`。
+
+- `action`：string(`Do` / `Ignore`)；进行下面规则判断，满足其中之一则过滤，否则不过滤。
+
+    - `Do`：白名单。binlog event 如果满足下面两个条件之一就会被过滤掉：
+        - 不在该 rule 的 `events` 中。
+        - 如果规则的 `sql-pattern` 不为空的话，对应的 SQL 没有匹配上 `sql-pattern` 中任意一项。
+    - `Ignore`：黑名单。如果满足下面两个条件之一就会被过滤掉：
+        - 在该 rule 的 `events` 中。
+        - 如果规则的 `sql-pattern` 不为空的话，对应的 SQL 可以匹配上 `sql-pattern` 中任意一项。
+
+### 使用示例
+
+#### 过滤分库分表的所有删除操作
+
+需要设置下面两个 `Binlog event filter rule` 来过滤掉所有的删除操作：
+
+- `filter-table-rule` 过滤掉所有匹配到 pattern `test_*`.`t_*` 的 table 的 `turncate table`、`drop table`、`delete statement` 操作。
+- `filter-schema-rule` 过滤掉所有匹配到 pattern `test_*` 的 schema 的 `drop database` 操作。
+
+```yaml
+filters:
+  filter-table-rule:
+    schema-pattern: "test_*"
+    table-pattern: "t_*"
+    events: ["truncate table", "drop table", "delete"]
+    action: Ignore
+  filter-schema-rule:
+    schema-pattern: "test_*"
+    events: ["drop database"]
+    action: Ignore
+```
+
+#### 只同步分库分表的 DML 操作
+
+需要设置下面两个 `Binlog event filter rule` 只同步 DML 操作：
+
+- `do-table-rule` 只同步所有匹配到 pattern `test_*`.`t_*` 的 table 的 `create table`、`insert`、`update`、`delete` 操作。
+- `do-schema-rule` 只同步所有匹配到 pattern `test_*` 的 schema 的 `create database` 操作。
+
+> **注意：**
+> 
+> 同步 `create database/table` 的原因是创建库和表后才能同步 `DML`。
+
+```yaml
+filters:
+  do-table-rule:
+    schema-pattern: "test_*"
+    table-pattern: "t_*"
+    events: ["create table", "all dml"]
+    action: Do
+  do-schema-rule:
+    schema-pattern: "test_*"
+    events: ["create database"]
+    action: Do
+```
+
+#### 过滤 TiDB 不支持的 SQL 语句
+
+可设置如下规则过滤 TiDB 不支持的 `PROCEDURE` 语句：
+
+```yaml
+filters:
+  filter-procedure-rule:
+    schema-pattern: "test_*"
+    table-pattern: "t_*"
+    sql-pattern: ["^DROP\\s+PROCEDURE", "^CREATE\\s+PROCEDURE"]
+    action: Ignore
+```
+
+#### 过滤 TiDB parser 不支持的 SQL 语句
+
+对于 TiDB parser 不支持的 SQL 语句，DM 无法解析获得 `schema`/`table` 信息，因此需要使用全局过滤规则：`schema-pattern: "*"`。
+
+> **注意：**
+> 
+> 全局过滤规则的设置必须尽可能严格，以避免预期之外地过滤掉需要同步的数据。
+
+可设置如下规则过滤 TiDB parser 不支持的 `PARTITION` 语句：
+
+```yaml
+filters:
+  filter-partition-rule:
+    schema-pattern: "*"
+    sql-pattern: ["ALTER\\s+TABLE[\\s\\S]*ADD\\s+PARTITION", "ALTER\\s+TABLE[\\s\\S]*DROP\\s+PARTITION"]
+    action: Ignore
+```
+
+## Column mapping
+
+Column mapping 提供对表的列值进行修改的功能。可以根据不同的表达式对表的指定列做不同的修改操作，目前只支持 DM 提供的内置表达式。
+
+> **注意：**
+> 
+> - 不支持修改 column 的类型和表结构。
+> - 不支持对同一个表设置多个不同的列值转换规则。
+
+### 参数配置
+
+```yaml
+column-mappings:
+  rule-1:
+​    schema-pattern: "test_*"
+​    table-pattern: "t_*"
+​    expression: "partition id"
+​    source-column: "id"
+​    target-column: "id"
+​    arguments: ["1", "test", "t", "_"]
+  rule-2:
+​    schema-pattern: "test_*"
+​    table-pattern: "t_*"
+​    expression: "partition id"
+​    source-column: "id"
+​    target-column: "id"
+​    arguments: ["2", "test", "t", "_"]
+```
+
+### 参数解释
+
+- [`schema-pattern`/`table-pattern`](/reference/tools/data-migration/table-selector.md)：对匹配上该规则的上游 MySQL/MariaDB 实例的表按照指定 `expression` 进行列值修改操作。
+- `source-column`，`target-column`：对 `source-column` 列的值按照指定 `expression` 进行修改，将修改后的值赋值给 `target-column`。
+- `expression`：对数据进行转换的表达式，目前只支持下面的内置计算表达式。
+
+#### `partition id` 表达式
+
+`partition id` 目的是为了解决分库分表合并同步的自增主键的冲突。
+
+**`partition id` 限制**
+
+注意下面的限制：
+
+- 只支持类型为 bigint 的列，通常为自增主键，联合主键或者联合唯一索引的其中一列
+- 如果 `schema 前缀` 不为空，则库名的组成必须为 `schema 前缀` 或者 `schema 前缀 + 分隔符 + 数字（即 schema ID）`，例如：支持 `s` 和 `s_1`，不支持 `s_a`
+- 如果 `table 前缀` 不为空，则表名的组成必须为 `table 前缀` 或者 `table 前缀 + 分隔符 + 数字（即 table ID）`
+- 如果库名/表名不包含 `… + 分隔符 + 数字` 部分，则对应的 ID 默认为 0
+- 对分库分表的规模支持限制如下
+    - 支持最多 16 个 MySQL/MariaDB 实例（0 <= instance ID <= 15）
+    - 每个实例支持最多 128 个 schema（0 <= schema ID  <= 127）
+    - 每个实例的每个 schema 支持最多 256 个 table（0 <= table ID <= 255）
+    - 进行列值映射的列的范围 (0 <= ID <= 17592186044415)
+    - `{instance ID, schema ID, table ID}` 组合需要保持唯一
+- 目前该功能是定制功能，如果需要调整请联系相关开发人员进行调整
+
+**`partition id` 参数配置**
+
+用户需要在 arguments 里面按顺序设置以下三个或四个参数：
+
+- `instance_id`：客户指定的上游分库分表的 MySQL/MariaDB instance ID（0 <= instance ID <= 15）
+- `schema 前缀`：用来解析库名并获取 `schema ID`
+- `table 前缀`：用来解释表名并获取 `table ID`
+- 分隔符：用来分隔前缀与 ID，可省略，省略时分隔符默认为空字符串
+
+`instance_id`、`schema 前缀` 和 `table 前缀` 这三个参数均可被设置为空字符串（`""`），表示对应的部分不会被编码进 `partition id`。
+
+**`partition id` 表达式规则**
+
+`partition id` 会用 arguments 里面的数字来填充自增主键 ID 的首个比特位，计算出来一个 int64（即 MySQL bigint）类型的值，具体规则如下：
+
+| instance_id | schema 前缀 | table 前缀 |                                                                编码 |
+|:----------- |:--------- |:-------- | -----------------------------------------------------------------:|
+| ☑ 已定义       | ☑ 已定义     | ☑ 已定义    | [`S`: 1 比特位] [`I`: 4 比特位] [`D`: 7 比特位] [`T`: 8 比特位] [`P`: 44 比特位] |
+| ☐ 空         | ☑ 已定义     | ☑ 已定义    |              [`S`: 1 比特位] [`D`: 7 比特位] [`T`: 8 比特位] [`P`: 48 比特位] |
+| ☑ 已定义       | ☐ 空       | ☑ 已定义    |              [`S`: 1 比特位] [`I`: 4 比特位] [`T`: 8 比特位] [`P`: 51 比特位] |
+| ☑ 已定义       | ☑ 已定义     | ☐ 空      |              [`S`: 1 比特位] [`I`: 4 比特位] [`D`: 7 比特位] [`P`: 52 比特位] |
+| ☐ 空         | ☐ 空       | ☑ 已定义    |                           [`S`: 1 比特位] [`T`: 8 比特位] [`P`: 55 比特位] |
+| ☐ 空         | ☑ 已定义     | ☐ 空      |                           [`S`: 1 比特位] [`D`: 7 比特位] [`P`: 56 比特位] |
+| ☑ 已定义       | ☐ 空       | ☐ 空      |                           [`S`: 1 比特位] [`I`: 4 比特位] [`P`: 59 比特位] |
+
+- `S`：符号位，保留
+- `I`：instance ID，默认 4 比特位
+- `D`：schema ID，默认 7 比特位
+- `T`：table ID，默认 8 比特位
+- `P`：自增主键 ID，占据剩下的比特位（≥44 比特位）
+
+### 使用示例
+
+假设存在分库分表场景：将上游两个 MySQL 实例的 `test_{1,2,3...}`.`t_{1,2,3...}` 同步到下游 TiDB 的 `test`.`t`，并且这些表都有自增主键。
+
+需要设置下面两个规则：
+
+```yaml
+column-mappings:
+  rule-1:
+​    schema-pattern: "test_*"
+​    table-pattern: "t_*"
+​    expression: "partition id"
+​    source-column: "id"
+​    target-column: "id"
+​    arguments: ["1", "test", "t", "_"]
+  rule-2:
+​    schema-pattern: "test_*"
+​    table-pattern: "t_*"
+​    expression: "partition id"
+​    source-column: "id"
+​    target-column: "id"
+​    arguments: ["2", "test", "t", "_"]
+```
+
+- MySQL instance 1 的表 `test_1`.`t_1` 的 `ID = 1` 的行经过转换后 ID = 1 变为 `1 << (64-1-4) | 1 << (64-1-4-7) | 1 << 44 | 1 = 580981944116838401`
+- MySQL instance 2 的表 `test_1`.`t_2` 的 `ID = 1` 的行经过转换后 ID = 2 变为 `2 << (64-1-4) | 1 << (64-1-4-7) | 2 << 44 | 2 = 1157460288606306306`
+
+## 同步延迟监控
+
+DM 支持通过 heartbeat 真实同步数据来计算每个同步任务与 MySQL/MariaDB 的实时同步延迟。
+
+> **注意：**
+> 
+> - 同步延迟的估算的精度在秒级别。
+> - heartbeat 相关的 binlog 不会同步到下游，在计算延迟后会被丢弃。
+
+### 系统权限
+
+如果开启 heartbeat 功能，需要上游 MySQL/MariaDB 实例提供下面的权限：
+
+- SELECT
+- INSERT
+- CREATE (databases, tables)
+
+### 参数配置
+
+在 task 的配置文件中设置：
+
+```
+enable-heartbeat: true
+```
+
+### 原理介绍
+
+- DM-worker 在对应的上游 MySQL/MariaDB 创建库 `dm_heartbeat`（当前不可配置）
+- DM-worker 在对应的上游 MySQL/MariaDB 创建表 `heartbeat`（当前不可配置）
+- DM-worker 每秒钟（当前不可配置）在对应的上游 MySQL/MariaDB 的 `dm_heartbeat`.`heartbeat` 表中，利用 `replace statement` 更新当前时间戳 `TS_master`
+- DM-worker 每个任务拿到 `dm_heartbeat`.`heartbeat` 的 binlog 后，更新自己的同步时间 `TS_slave_task`
+- DM-worker 每 10 秒在对应的上游 MySQL/MariaDB 的 `dm_heartbeat`.`heartbeat` 查询当前的 `TS_master`，并且对每个任务计算 `task_lag` = `TS_master` - `TS_slave_task`
+
+可以在 metrics 的 [binlog replication](/reference/tools/data-migration/monitor.md#binlog-replication) 处理单元找到 replicate lag 监控项。
