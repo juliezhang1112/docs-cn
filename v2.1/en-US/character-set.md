@@ -60,7 +60,7 @@ mysql> SHOW COLLATION WHERE Charset = 'latin1';
 
 每一个字符集，都有一个默认的 Collation，例如 `utf8` 的默认 Collation 就为 `utf8_bin`。
 
-> **注意：**
+> **Note:**
 > 
 > `TiDB` 目前的 Collation 都是区分大小写的。
 
@@ -79,7 +79,7 @@ mysql> SHOW COLLATION WHERE Charset = 'latin1';
 | \_ci | 大小写不敏感                    |
 | \_cs | 大小写敏感                     |
 
-> **注意：**
+> **Note:**
 > 
 > 目前为止 TiDB 只支持部分以上提到的 Collation。
 
@@ -196,7 +196,9 @@ col_name {ENUM | SET} (val_list)
 SET character_set_client = charset_name;
 SET character_set_results = charset_name;
 SET character_set_connection = charset_name;
+
 ```
+
 `COLLATE` 是可选的，如果没有提供，将会用 charset_name 默认的 Collation。
 
 * `SET CHARACTER SET 'charset_name'`
@@ -207,6 +209,13 @@ SET character_set_connection = charset_name;
 SET character_set_client = charset_name;
 SET character_set_results = charset_name;
 SET collation_connection = @@collation_database;
+
 ```
+
+## 字符合法性检查
+
+当指定的字符集为 utf8 或 utf8mb4 时，TiDB 仅支持合法的 utf8 字符。对于不合法的字符，会报错：`incorrect utf8 value`。该字符合法性检查与 MySQL 8.0 兼容，与 MySQL 5.7 及以下版本不兼容。
+
+如果不希望报错，可以通过 `set @@tidb_skip_utf8_check=1;` 跳过字符检查。
 
 更多细节，参考 [Connection Character Sets and Collations](https://dev.mysql.com/doc/refman/5.7/en/charset-connection.html)。
