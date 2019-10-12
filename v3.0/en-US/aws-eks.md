@@ -32,7 +32,7 @@ aliases:
     Default output format [None]: json
     ```
 
-    > **注意：**
+    > **Note:**
     > 
     > Access key 必须至少具有以下权限：创建 VPC、创建 EBS、创建 EC2 和创建 Role。
 
@@ -103,7 +103,7 @@ terraform init
 terraform apply
 ```
 
-> **注意：**
+> **Note:**
 > 
 > `terraform apply` 过程中必须输入 "yes" 才能继续。
 
@@ -127,7 +127,7 @@ region = us-west-21
 
 你可以通过 `terraform output` 命令再次获取上面的输出信息。
 
-> **注意：**
+> **Note:**
 > 
 > 1.14 版本以前的 EKS 不支持自动开启 NLB 跨可用区负载均衡，因此默认配置下 会出现各台 TiDB 实例压力不均衡额状况。生产环境下，强烈建议参考 [AWS 官方文档](https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/enable-disable-crosszone-lb.html#enable-cross-zone)手动开启 NLB 的跨可用区负载均衡。
 
@@ -209,7 +209,7 @@ Grafana 默认登录信息：
  }
 ```
 
-> **注意：**
+> **Note:**
 > 
 > 升级过程会持续一段时间，你可以通过 `kubectl --kubeconfig credentials/kubeconfig_<cluster_name> get po -n tidb --watch` 命令持续观察升级进度。
 
@@ -225,7 +225,7 @@ Grafana 默认登录信息：
  }
 ```
 
-> **注意：**
+> **Note:**
 > 
 > - 由于缩容过程中无法确定会缩掉哪个节点，目前还不支持 TiDB 集群的缩容。
 > - 扩容过程会持续几分钟，你可以通过 `kubectl --kubeconfig credentials/kubeconfig_<cluster_name> get po -n tidb --watch` 命令持续观察进度。
@@ -238,7 +238,7 @@ Grafana 默认登录信息：
 
 默认情况下 terraform 脚本会新建 VPC。你也可以通过设置 `create_vpc` 为 `false`，并指定 `vpc_id`、`private_subnet_ids` 和 `public_subnet_ids` 变量为已有的 VPC id、subnet ids 来使用现有的网络。
 
-> **注意：**
+> **Note:**
 > 
 > - 由于 AWS 和 Terraform 的限制，还不支持复用已有 EKS 集群的 VPC 和 subnets，所以请确保只在你手动创建 VPC 的情况下修改该参数；
 > - EKS Node 上的 CNI 插件会为每个节点预留一部分 IP 资源，因此 IP 消耗较大，在手动创建 VPC 时，建议将每个 subnet 的掩码长度设置在 18~20 以确保 IP 资源充足，或参考 [EKS CNI 插件文档](https://github.com/aws/amazon-vpc-cni-k8s#cni-configuration-variables)将节点预留的 IP 资源数调低。
@@ -309,7 +309,7 @@ module example-cluster {
 }
 ```
 
-> **注意：**
+> **Note:**
 > 
 > `cluster_name` 必须是唯一的。
 
@@ -337,7 +337,7 @@ output "example-cluster_monitor-hostname" {
 terraform destroy
 ```
 
-> **注意：**
+> **Note:**
 > 
 > * 该操作会销毁 EKS 集群以及部署在该 EKS 集群上的所有 TiDB 集群。
 > * 如果你不再需要存储卷中的数据，在执行 `terraform destroy` 后，你需要在 AWS 控制台手动删除 EBS 卷。
@@ -472,7 +472,7 @@ output "bastion_ip" {
 
 另外，这些 Terraform 模块可以很容易地集成到你自己的 Terraform 工作流中。假如你对 Terraform 非常熟悉，这也是我们推荐的一种使用方式。
 
-> **注意：**
+> **Note:**
 > 
 > * 由于 Terraform 本身的限制（[hashicorp/terraform#2430](https://github.com/hashicorp/terraform/issues/2430#issuecomment-370685911)），在你自己的 Terraform 脚本中，也需要保留上述例子中对 `helm provider` 的特殊处理。
 > * 创建新目录时，需要注意与 Terraform 模块之间的相对路径，这会影响调用模块时的 `source` 参数。
