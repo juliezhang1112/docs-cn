@@ -1,101 +1,99 @@
 ---
-title: Data Migration 简介
+title: TiDB 事务语句
 category: reference
 ---
 
-# Data Migration 简介
+# TiDB 事务语句
 
-[DM](https://github.com/pingcap/dm) (Data Migration) 是一体化的数据同步任务管理平台，支持从 MySQL 或 MariaDB 到 TiDB 的全量数据迁移和增量数据同步。使用 DM 工具有利于简化错误处理流程，降低运维成本。
+TiDB 支持分布式事务。涉及到事务的语句包括 `autocommit` 变量、`[BEGIN|START TRANSACTION]`、`COMMIT` 以及 `ROLLBACK`。
 
-## DM 架构
+## 自动提交
 
-DM 主要包括三个组件：DM-master，DM-worker 和 dmctl。
+语法：
 
-![Data Migration architecture](/media/dm-architecture.png)
+```sql
+SET autocommit = {0 | 1}
+```
 
-### DM-master
+通过设置 `autocommit` 的值为 1，可以将当前 Session 设置为自动提交状态，0 则表示当前 Session 为非自动提交状态。默认情况下，`autocommit` 的值为 1。
 
-DM-master 负责管理和调度数据同步任务的各项操作。
+在自动提交状态，每条语句运行后，会将其修改自动提交到数据库中。否则，会等到运行 `COMMIT` 语句或者是某些会造成隐式提交的情况，详见 [implicit commit](https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html)。比如，执行 `[BEGIN|START TRANCATION]` 语句的时候会试图提交上一个事务，并开启一个新的事务。
 
-- 保存 DM 集群的拓扑信息
-- 监控 DM-worker 进程的运行状态
-- 监控数据同步任务的运行状态
-- 提供数据同步任务管理的统一入口
-- 协调分库分表场景下各个实例分表的 DDL 同步
+另外 `autocommit` 也是一个 System Variable，所以可以通过变量赋值语句修改当前 Session 或者是 Global 的值。
 
-### DM-worker
+```sql
+SET @@SESSION.autocommit = {0 | 1};
+SET @@GLOBAL.autocommit = {0 | 1};
+```
 
-DM-worker 负责执行具体的数据同步任务。
+## START TRANSACTION, BEGIN
 
-- 将 binlog 数据持久化保存在本地
-- 保存数据同步子任务的配置信息
-- 编排数据同步子任务的运行
-- 监控数据同步子任务的运行状态
+语法:
 
-DM-worker 启动后，会自动同步上游 binlog 至本地配置目录（如果使用 DM-Ansible 部署 DM 集群，默认的同步目录为 `<deploy_dir>/relay_log`）。关于 DM-worker，详见 [DM-worker 简介](/reference/tools/data-migration/dm-worker-intro.md)。关于 relay log，详见 [DM Relay Log](/reference/tools/data-migration/relay-log.md)。
+```sql
+BEGIN;
 
-### dmctl
+START TRANSACTION;
 
-dmctl 是用来控制 DM 集群的命令行工具。
+START TRANSACTION WITH CONSISTENT SNAPSHOT;
+```
 
-- 创建、更新或删除数据同步任务
-- 查看数据同步任务状态
-- 处理数据同步任务错误
-- 校验数据同步任务配置的正确性
+上述三条语句都是事务开始语句，效果相同。通过事务开始语句可以显式地开始一个新的事务，如果这个时候当前 Session 正在一个事务中间过程中，会将当前事务提交后，开启一个新的事务。
 
-## 同步功能介绍
+## COMMIT
 
-下面简单介绍 DM 数据同步功能的核心特性。
+语法：
 
-### Table routing
+```sql
+COMMIT;
+```
 
-[Table routing](/reference/tools/data-migration/features/overview.md#table-routing) 是指将上游 MySQL 或 MariaDB 实例的某些表同步到下游指定表的路由功能，可以用于分库分表的合并同步。
+提交当前事务，包括从 `[BEGIN|START TRANSACTION]` 到 `COMMIT` 之间的所有修改。
 
-### Black & white table lists
+## ROLLBACK
 
-[Black & white table lists](/reference/tools/data-migration/features/overview.md#black-white-table-lists) 是指上游数据库实例表的黑白名单过滤规则。其过滤规则类似于 MySQL `replication-rules-db`/`replication-rules-table`，可以用来过滤或只同步某些数据库或某些表的所有操作。
+语法：
 
-### Binlog event filter
+```sql
+ROLLBACK;
+```
 
-[Binlog event filter](/reference/tools/data-migration/features/overview.md#binlog-event-filter) 是比库表同步黑白名单更加细粒度的过滤规则，可以指定只同步或者过滤掉某些 `schema`/`table` 的指定类型的 binlog events，比如 `INSERT`，`TRUNCATE TABLE`。
+回滚当前事务，撤销从 `[BEGIN|START TRANSACTION]` 到 `ROLLBACK` 之间的所有修改。
 
-### Column mapping
+## 显式事务和隐式事务
 
-[Column mapping](/reference/tools/data-migration/features/overview.md#column-mapping) 是指根据用户指定的内置表达式对表的列进行转换，可以用来解决分库分表合并时自增主键 ID 的冲突。
+TiDB 可以显式地使用事务（`[BEGIN|START TRANSACTION]`/`COMMIT`）或者隐式的使用事务（`SET autocommit = 1`）。
 
-### Shard support
+如果在 `autocommit = 1` 的状态下，通过 `[BEGIN|START TRANSACTION]` 语句开启一个新的事务，那么在 `COMMIT`/`ROLLBACK` 之前，会禁用 autocommit，也就是变成显式事务。
 
-DM 支持对原分库分表进行合库合表操作，但需要满足一些[使用限制](/reference/tools/data-migration/features/shard-merge.md#使用限制)。
+对于 DDL 语句，会自动提交并且不能回滚。如果运行 DDL 的时候，正在一个事务的中间过程中，会先将当前的事务提交，再执行 DDL。
 
-## 使用限制
+## 事务隔离级别
 
-在使用 DM 工具之前，需了解以下限制：
+TiDB **只支持** `SNAPSHOT ISOLATION`，可以通过下面的语句将当前 Session 的隔离级别设置为 `READ COMMITTED`，这只是语法上的兼容，事务依旧是以 `SNAPSHOT ISOLATION` 来执行。
 
-+ 数据库版本
+```sql
+SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
+```
 
-    - 5.5 < MySQL 版本 < 5.8
-    - MariaDB 版本 >= 10.1.2
+## 事务的惰性检查
 
-    > **注意：**
-    > 
-    > 如果上游 MySQL/MariaDB server 间构成主从复制结构，则
-    > 
-    > - 5.7.1 < MySQL 版本 < 5.8
-    > - MariaDB 版本 >= 10.1.3
+TiDB 中，对于普通的 `INSERT` 语句写入的值，会进行惰性检查。惰性检查的含义是，不在 `INSERT` 语句执行时进行唯一约束的检查，而在事务提交时进行唯一约束的检查。
 
-    在使用 dmctl 启动任务时，DM 会自动对任务上下游数据库的配置、权限等进行[前置检查](/reference/tools/data-migration/precheck.md)。
+举例：
 
-+ DDL 语法
+```sql
+CREATE TABLE T (I INT KEY);
+INSERT INTO T VALUES (1);
+BEGIN;
+INSERT INTO T VALUES (1); -- MySQL 返回错误；TiDB 返回成功
+INSERT INTO T VALUES (2);
+COMMIT; -- MySQL 提交成功；TiDB 返回错误，事务回滚
+SELECT * FROM T; -- MySQL 返回 1 2；TiDB 返回 1
+```
 
-    - 目前，TiDB 部分兼容 MySQL 支持的 DDL 语句。因为 DM 使用 TiDB parser 来解析处理 DDL 语句，所以目前仅支持 TiDB parser 支持的 DDL 语法。
-    - DM 遇到不兼容的 DDL 语句时会报错。要解决此报错，需要使用 dmctl 手动处理，要么跳过该 DDL 语句，要么用指定的 DDL 语句来替换它。
+惰性检查的意义在于，如果对事务中每个 `INSERT` 语句都立刻进行唯一性约束检查，将造成很高的网络开销。而在提交时进行一次批量检查，将会大幅提升性能。
 
-+ 分库分表
-
-    - 如果业务分库分表之间存在数据冲突，冲突的列**只有自增主键列**，并且**列的类型是 bigint**，可以尝试使用 [Column mapping](/reference/tools/data-migration/features/overview.md#column-mapping) 来解决；否则不推荐使用 DM 进行同步，如果进行同步则有冲突的数据会相互覆盖造成数据丢失。
-    - 关于分库分表合并场景的其它限制，参见[使用限制](/reference/tools/data-migration/features/shard-merge.md#使用限制)。
-
-+ 操作限制
-
-    - DM-worker 重启后不能自动恢复数据同步任务，需要使用 dmctl 手动执行 `start-task`。详见[管理数据同步任务](/reference/tools/data-migration/manage-tasks.md)。
-    - 在一些情况下，DM-worker 重启后不能自动恢复 DDL lock 同步，需要手动处理。详见[手动处理 Sharding DDL Lock](/reference/tools/data-migration/features/manually-handling-sharding-ddl-locks.md)。
+> **注意：**
+> 
+> 本优化对于 `INSERT IGNORE` 和 `INSERT ON DUPLICATE KEY UPDATE` 不会生效，仅对与普通的 `INSERT` 语句生效。
