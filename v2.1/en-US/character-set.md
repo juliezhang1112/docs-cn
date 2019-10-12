@@ -60,7 +60,7 @@ mysql> SHOW COLLATION WHERE Charset = 'latin1';
 
 每一个字符集，都有一个默认的 Collation，例如 `utf8` 的默认 Collation 就为 `utf8_bin`。
 
-> **注意：**
+> **Note:**
 > 
 > `TiDB` 目前的 Collation 都是区分大小写的。
 
@@ -79,7 +79,7 @@ mysql> SHOW COLLATION WHERE Charset = 'latin1';
 | \_ci | 大小写不敏感                    |
 | \_cs | 大小写敏感                     |
 
-> **注意：**
+> **Note:**
 > 
 > 目前为止 TiDB 只支持部分以上提到的 Collation。
 
