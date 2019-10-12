@@ -28,7 +28,7 @@ mysql> SHOW CHARACTER SET;
 5 rows in set (0.00 sec)
 ```
 
-> **注意：**
+> **Note:**
 > 
 > - 在 `TiDB` 中 `utf8` 被当做成了 `utf8mb4` 来处理。
 > - 每种字符集都对应一个默认的 Collation，当前有且仅有一个。
@@ -67,7 +67,7 @@ mysql> SHOW COLLATION WHERE Charset = 'latin1';
 
 每一个字符集，都有一个默认的 Collation，例如 `utf8` 的默认 Collation 就为 `utf8_bin`。
 
-> **注意：**
+> **Note:**
 > 
 > `TiDB` 目前的 Collation 只支持区分大小写的比较排序规则。
 
@@ -86,7 +86,7 @@ mysql> SHOW COLLATION WHERE Charset = 'latin1';
 | \_ci | 大小写不敏感                    |
 | \_cs | 大小写敏感                     |
 
-> **注意：**
+> **Note:**
 > 
 > 目前为止 TiDB 只支持部分以上提到的 Collation。
 
