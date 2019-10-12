@@ -11,7 +11,7 @@ category: reference
 
 TiDB Operator 使用 Helm 部署和管理 TiDB 集群。通过 Helm 获取的配置文件默认提供了基本的配置，通过这个基本配置，可以快速启动一个 TiDB 集群。但是如果用户需要特殊配置或是用于生产环境，则需要根据以下配置参数列表手动配置对应的配置项。
 
-> **注意：**
+> **Note:**
 > 
 > 下文用 `values.yaml` 指代要修改的 TiDB 集群配置文件。
 
@@ -194,7 +194,7 @@ affinity:
 
 * 为 PD 设置拓扑位置 Label 集合
 
-    > **注意：**
+    > **Note:**
     > 
     > 除 `kubernetes.io/hostname` 外，目前 PD 暂不支持名字中带 `/` 的 Label。
 
