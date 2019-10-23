@@ -1,102 +1,66 @@
 ---
-title: TiDB 事务语句
-category: reference
-aliases:
-  - '/docs-cn/sql/transaction/'
-  - '/docs-cn/dev/reference/sql/statements/transaction/'
+title: TiDB 简介
+category: introduction
 ---
 
-# TiDB 事务语句
+# TiDB 简介
 
-TiDB 支持分布式事务。涉及到事务的语句包括 `autocommit` 变量、`[BEGIN|START TRANSACTION]`、`COMMIT` 以及 `ROLLBACK`。
+TiDB 是 PingCAP 公司设计的开源分布式 HTAP (Hybrid Transactional and Analytical Processing) 数据库，结合了传统的 RDBMS 和 NoSQL 的最佳特性。TiDB 兼容 MySQL，支持无限的水平扩展，具备强一致性和高可用性。TiDB 的目标是为 OLTP (Online Transactional Processing) 和 OLAP (Online Analytical Processing) 场景提供一站式的解决方案。
 
-## 自动提交
+TiDB 具备如下特性：
 
-语法：
+- 高度兼容 MySQL
 
-```sql
-SET autocommit = {0 | 1}
-```
+    [大多数情况下](/reference/mysql-compatibility.md)，无需修改代码即可从 MySQL 轻松迁移至 TiDB，分库分表后的 MySQL 集群亦可通过 TiDB 工具进行实时迁移。
 
-通过设置 `autocommit` 的值为 1，可以将当前 Session 设置为自动提交状态，0 则表示当前 Session 为非自动提交状态。默认情况下，`autocommit` 的值为 1。
+- 水平弹性扩展
 
-在自动提交状态，每条语句运行后，会将其修改自动提交到数据库中。否则，会等到运行 `COMMIT` 语句或者是某些会造成隐式提交的情况，详见 [implicit commit](https://dev.mysql.com/doc/refman/8.0/en/implicit-commit.html)。比如，执行 `[BEGIN|START TRANCATION]` 语句的时候会试图提交上一个事务，并开启一个新的事务。
+    通过简单地增加新节点即可实现 TiDB 的水平扩展，按需扩展吞吐或存储，轻松应对高并发、海量数据场景。
 
-另外 `autocommit` 也是一个 System Variable，所以可以通过变量赋值语句修改当前 Session 或者是 Global 的值。
+- 分布式事务
 
-```sql
-SET @@SESSION.autocommit = {0 | 1};
-SET @@GLOBAL.autocommit = {0 | 1};
-```
+    TiDB 100% 支持标准的 ACID 事务。
 
-## START TRANSACTION, BEGIN
+- 真正金融级高可用
 
-语法:
+    相比于传统主从 (M-S) 复制方案，基于 Raft 的多数派选举协议可以提供金融级的 100% 数据强一致性保证，且在不丢失大多数副本的前提下，可以实现故障的自动恢复 (auto-failover)，无需人工介入。
 
-```sql
-BEGIN;
+- 一站式 HTAP 解决方案
 
-START TRANSACTION;
+    TiDB 作为典型的 OLTP 行存数据库，同时兼具强大的 OLAP 性能，配合 TiSpark，可提供一站式 HTAP 解决方案，一份存储同时处理 OLTP & OLAP，无需传统繁琐的 ETL 过程。
 
-START TRANSACTION WITH CONSISTENT SNAPSHOT;
-```
+- 云原生 SQL 数据库
 
-上述三条语句都是事务开始语句，效果相同。通过事务开始语句可以显式地开始一个新的事务，如果这个时候当前 Session 正在一个事务中间过程中，会将当前事务提交后，开启一个新的事务。
+    TiDB 是为云而设计的数据库，支持公有云、私有云和混合云，配合 [TiDB Operator 项目](/tidb-in-kubernetes/tidb-operator-overview.md) 可实现自动化运维，使部署、配置和维护变得十分简单。
 
-## COMMIT
+TiDB 的设计目标是 100% 的 OLTP 场景和 80% 的 OLAP 场景，更复杂的 OLAP 分析可以通过 [TiSpark 项目](/reference/tispark.md)来完成。
 
-语法：
+TiDB 对业务没有任何侵入性，能优雅的替换传统的数据库中间件、数据库分库分表等 Sharding 方案。同时它也让开发运维人员不用关注数据库 Scale 的细节问题，专注于业务开发，极大的提升研发的生产力。
 
-```sql
-COMMIT;
-```
+三篇文章了解 TiDB 技术内幕：
 
-提交当前事务，包括从 `[BEGIN|START TRANSACTION]` 到 `COMMIT` 之间的所有修改。
+- [说存储](https://pingcap.com/blog-cn/tidb-internal-1/)
+- [说计算](https://pingcap.com/blog-cn/tidb-internal-2/)
+- [谈调度](https://pingcap.com/blog-cn/tidb-internal-3/)
 
-## ROLLBACK
+## 部署方式
 
-语法：
+TiDB 可以部署在本地和云平台上，支持公有云、私有云和混合云。你可以根据实际场景或需求，选择相应的方式来部署 TiDB 集群：
 
-```sql
-ROLLBACK;
-```
+- [使用 Ansible 部署](/how-to/deploy/orchestrated/ansible.md)：如果用于生产环境，推荐使用 Ansible 部署 TiDB 集群。
+- [使用 Ansible 离线部署](/how-to/deploy/orchestrated/offline-ansible.md)：如果部署环境无法访问网络，可使用 Ansible 进行离线部署。
+- [使用 TiDB Operator 部署](/tidb-in-kubernetes/deploy/tidb-operator.md)：使用 TiDB Operator 在 Kubernetes 集群上部署生产就绪的 TiDB 集群，支持[部署到 AWS EKS](/tidb-in-kubernetes/deploy/aws-eks.md)、[部署到谷歌云 GKE (beta)](/tidb-in-kubernetes/deploy/gcp-gke.md)、[部署到阿里云 ACK](/tidb-in-kubernetes/deploy/alibaba-cloud.md) 等。
+- [使用 Docker Compose 部署](/how-to/get-started/deploy-tidb-from-docker-compose.md)：如果你只是想测试 TiDB、体验 TiDB 的特性，或者用于开发环境，可以使用 Docker Compose 在本地快速部署 TiDB 集群。该部署方式不适用于生产环境。
+- [使用 Docker 部署](/how-to/deploy/orchestrated/docker.md)：你可以使用 Docker 部署 TiDB 集群，但该部署方式不适用于生产环境。
+- [使用 TiDB Operator 部署到 Minikube](/tidb-in-kubernetes/get-started/deploy-tidb-from-kubernetes-minikube.md)：你可以使用 TiDB Opeartor 将 TiDB 集群部署到本地 Minikube 启动的 Kubernetes 集群中。该部署方式不适用于生产环境。
+- [使用 TiDB Operator 部署到 DinD](/tidb-in-kubernetes/get-started/deploy-tidb-from-kubernetes-dind.md)：你可以使用 TiDB Operator 将 TiDB 集群部署到本地以 DinD 方式启动的 Kubernetes 集群中。该部署方式不适用于生产环境。
 
-回滚当前事务，撤销从 `[BEGIN|START TRANSACTION]` 到 `ROLLBACK` 之间的所有修改。
+## 项目源码
 
-## 显式事务和隐式事务
+TiDB 集群所有组件的源码均可从 GitHub 上直接访问：
 
-TiDB 可以显式地使用事务（`[BEGIN|START TRANSACTION]`/`COMMIT`）或者隐式的使用事务（`SET autocommit = 1`）。
-
-如果在 `autocommit = 1` 的状态下，通过 `[BEGIN|START TRANSACTION]` 语句开启一个新的事务，那么在 `COMMIT`/`ROLLBACK` 之前，会禁用 autocommit，也就是变成显式事务。
-
-对于 DDL 语句，会自动提交并且不能回滚。如果运行 DDL 的时候，正在一个事务的中间过程中，会先将当前的事务提交，再执行 DDL。
-
-## 事务隔离级别
-
-TiDB **只支持** `SNAPSHOT ISOLATION`，可以通过下面的语句将当前 Session 的隔离级别设置为 `READ COMMITTED`，这只是语法上的兼容，事务依旧是以 `SNAPSHOT ISOLATION` 来执行。
-
-```sql
-SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED;
-```
-
-## 事务的惰性检查
-
-TiDB 中，对于普通的 `INSERT` 语句写入的值，会进行惰性检查。惰性检查的含义是，不在 `INSERT` 语句执行时进行唯一约束的检查，而在事务提交时进行唯一约束的检查。
-
-举例：
-
-```sql
-CREATE TABLE T (I INT KEY);
-INSERT INTO T VALUES (1);
-BEGIN;
-INSERT INTO T VALUES (1); -- MySQL 返回错误；TiDB 返回成功
-INSERT INTO T VALUES (2);
-COMMIT; -- MySQL 提交成功；TiDB 返回错误，事务回滚
-SELECT * FROM T; -- MySQL 返回 1 2；TiDB 返回 1
-```
-
-惰性检查的意义在于，如果对事务中每个 `INSERT` 语句都立刻进行唯一性约束检查，将造成很高的网络开销。而在提交时进行一次批量检查，将会大幅提升性能。
-
-> **注意：**
-> 
-> 本优化对于 `INSERT IGNORE` 和 `INSERT ON DUPLICATE KEY UPDATE` 不会生效，仅对与普通的 `INSERT` 语句生效。
+- [TiDB](https://github.com/pingcap/tidb)
+- [TiKV](https://github.com/tikv/tikv)
+- [PD](https://github.com/pingcap/pd)
+- [TiSpark](https://github.com/pingcap/tispark)
+- [TiDB Operator](https://github.com/pingcap/tidb-operator)
